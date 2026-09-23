@@ -1,0 +1,125 @@
+*&---------------------------------------------------------------------*
+*& Report  ZCRMR_ZCRM_ORDER_UPDATE
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT zcrmr_zcrm_order_update.
+
+
+TYPES : BEGIN OF sel,
+          sel,
+        END OF sel,
+
+        BEGIN OF ty_l_index.
+          INCLUDE TYPE zcrm_order.
+          INCLUDE TYPE sel.
+TYPES : END OF ty_l_index.
+
+DATA: lv_order TYPE zorder_no.
+*DATA: lv_type TYPE ZPROC_TYPE.
+
+SELECT-OPTIONS : s_order  FOR lv_order.
+PARAMETERS :     p_type TYPE zproc_type.
+
+
+DATA : gt_fcat   TYPE slis_t_fieldcat_alv,
+       gs_fcat   TYPE slis_fieldcat_alv,
+       gs_layout TYPE slis_layout_alv,
+
+       gt_index  TYPE TABLE OF ty_l_index,
+       gs_index  LIKE LINE OF gt_index.
+
+CONSTANTS : gv_s TYPE c VALUE 'S',
+            gv_e TYPE c VALUE 'E'.
+
+START-OF-SELECTION.
+
+  gs_layout-colwidth_optimize = abap_true.
+  gs_layout-box_fieldname = 'SEL'.
+
+  REFRESH : gt_index.
+  SELECT * FROM zcrm_order
+  INTO TABLE @gt_index
+  WHERE order_no IN @s_order
+  AND proc_type = @p_type.
+  IF NOT gt_index IS INITIAL.
+    SORT gt_index BY order_no. "Added by TP_HTL206580(Alsadh) 23.06.2026 18:06:46
+*     IF sy-subrc <> 0.        "Commented By TP_HTL206580(Alsadh) on 24.06.2026 12:56:47
+  ELSE.
+    MESSAGE 'No data found' TYPE gv_s DISPLAY LIKE gv_e.
+    STOP.
+  ENDIF.
+
+  CALL FUNCTION 'REUSE_ALV_FIELDCATALOG_MERGE'
+    EXPORTING
+      i_structure_name       = 'ZCRM_ORDER'
+    CHANGING
+      ct_fieldcat            = gt_fcat
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+
+  IF sy-subrc <> 0.
+*   IMPLEMENT SUITABLE ERROR HANDLING HERE
+  ENDIF.
+  LOOP AT gt_fcat INTO gs_fcat.
+*    IF gs_fcat-fieldname = 'GUID'.
+*      CLEAR : gs_fcat-edit.
+*    ELSE.
+    gs_fcat-edit = abap_true.
+*    ENDIF.
+    MODIFY gt_fcat FROM gs_fcat INDEX sy-tabix.
+  ENDLOOP.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program       = sy-repid
+      is_layout                = gs_layout
+      it_fieldcat              = gt_fcat
+      i_callback_user_command  = 'USER_COMMAND_MODEL'
+      i_callback_pf_status_set = 'STANDARD'
+    TABLES
+      t_outtab                 = gt_index
+    EXCEPTIONS
+      program_error            = 1
+      OTHERS                   = 2.
+  IF sy-subrc <> 0.
+*   IMPLEMENT SUITABLE ERROR HANDLING HERE
+  ENDIF.
+  FREE : gt_index , gt_fcat.
+
+FORM standard USING p_extab TYPE slis_t_extab.
+
+  SET PF-STATUS 'STANDARD'.
+
+ENDFORM.
+FORM user_command_model  USING r_ucomm LIKE sy-ucomm
+                                rs_selfield TYPE slis_selfield.
+  rs_selfield-refresh = 'X'.
+  CASE r_ucomm.
+    WHEN '&DATA_SAVE'.
+      DATA : lt_ind TYPE TABLE OF zcrm_order,
+             ls_ind TYPE zcrm_order.
+      LOOP AT gt_index INTO gs_index WHERE sel = abap_true.
+        MOVE-CORRESPONDING gs_index TO ls_ind.
+        APPEND ls_ind TO lt_ind.
+        CLEAR : ls_ind , gs_index.
+      ENDLOOP.
+      IF lt_ind IS INITIAL.
+        MESSAGE 'Please select line item' TYPE 'I'.
+      ELSE.
+        MODIFY zcrm_order FROM TABLE lt_ind.
+        IF sy-subrc = 0.
+          MESSAGE 'Updated Successfully' TYPE 'I'.
+        ELSE.
+          MESSAGE 'Update Failed' TYPE 'I'.
+        ENDIF.
+        FREE: lt_ind.
+      ENDIF.
+    WHEN 'F12'.
+      CALL TRANSACTION 'SESSION_MANAGER'.
+  ENDCASE.
+ENDFORM.
