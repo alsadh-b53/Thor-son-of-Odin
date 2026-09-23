@@ -1,0 +1,159 @@
+*&---------------------------------------------------------------------*
+*& Report ZDBM_TOC
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zdbm_toc.
+
+TYPES : BEGIN OF ty_destination,
+          target TYPE ztargets,
+        END OF ty_destination.
+
+DATA : gv_task        TYPE trkorr,
+       lt_destination TYPE TABLE OF ty_destination,
+       gv_toc_number  TYPE  trkorr,
+       gt_toc_bdc     TYPE TABLE OF bdcdata,
+       gt_bdc_log     TYPE TABLE OF bdcmsgcoll,
+       rfc_dest       TYPE string,
+       gv_target_c    TYPE tmsbuffer-tarcli.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+  SELECT-OPTIONS : s_task FOR gv_task NO INTERVALS OBLIGATORY.
+  PARAMETERS     : p_desc TYPE char60,
+                   p_des  TYPE tr_target.
+SELECTION-SCREEN END OF BLOCK b1.
+
+
+
+INITIALIZATION.
+
+  REFRESH lt_destination.
+  lt_destination = VALUE #( ( target = '/ZQDBM1/' )
+                            ( target = '/ZQDBM2/' )
+                            ( target = '/ZQDBM3/' ) ).
+
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_des.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield     = 'TARGET'
+      dynpprog     = sy-repid
+      dynpnr       = '1000'
+      dynprofield  = 'P_DES'
+      window_title = 'Target System'
+      value_org    = 'S'
+    TABLES
+      value_tab    = lt_destination.
+  IF sy-subrc <> 0.
+  ENDIF.
+
+
+START-OF-SELECTION.
+
+  IF p_desc IS INITIAL.
+    p_desc = | Toc - { s_task-low } |.
+  ENDIF.
+
+  CLEAR : gv_toc_number.
+
+  CALL FUNCTION 'TR_EXT_CREATE_REQUEST'
+    EXPORTING
+      iv_request_type = 'T'
+      iv_target       = p_des
+      iv_author       = sy-uname
+      iv_text         = p_desc
+    IMPORTING
+      es_req_id       = gv_toc_number.
+
+
+  IF gv_toc_number IS NOT INITIAL.
+
+    REFRESH :gt_toc_bdc[],
+             gt_bdc_log[].
+
+    gt_toc_bdc = VALUE #( ( program = 'RDDM0001' dynpro = '0200' dynbegin = 'X' )
+                          ( fnam = 'BDC_OKCODE' fval = '=SINGLE_REQUEST' )
+                          ( fnam = 'BDC_CURSOR' fval = 'TRDYSE01SN-TR_TRKORR' )
+                          ( fnam = 'TRDYSE01SN-TR_TRKORR' fval = gv_toc_number )
+                          ( program = 'SAPMSSY0' dynpro = '0120' dynbegin = 'X' ) ).
+
+    gt_toc_bdc = VALUE #( BASE gt_toc_bdc FOR ls_task IN s_task[]
+                                 ( fnam = 'BDC_CURSOR' fval = '10/26' )
+                                 ( fnam = 'BDC_OKCODE' fval = '=INOB' )
+                                 ( program = 'SAPLSTRH' dynpro = '0100' dynbegin = 'X' )
+                                 ( fnam = 'BDC_CURSOR' fval = 'DV_0100_SOURCE_REQUEST' )
+                                 ( fnam = 'BDC_OKCODE' fval = '=TAKE' )
+                                 ( fnam = 'DV_0100_COPY_ONE_REQUEST' fval = 'X' )
+                                 ( fnam = 'DV_0100_SOURCE_REQUEST' fval = ls_task-low )
+                                 ( program = 'SAPMSSY0' dynpro = '0120' dynbegin = 'X' ) ).
+
+    gt_toc_bdc = VALUE #( BASE gt_toc_bdc ( fnam = 'BDC_CURSOR' fval = '10/26' )
+                          ( fnam = 'BDC_OKCODE' fval = '=TRRT' )
+                          ( program = 'RDDM0001' dynpro = '0200' dynbegin = 'X' )
+                          ( fnam = 'BDC_OKCODE' fval = '/EBACK' )  ).
+
+    CALL TRANSACTION 'SE01' USING gt_toc_bdc
+                            MODE 'N'
+                            UPDATE 'S'
+                            MESSAGES INTO gt_bdc_log.
+
+    DELETE gt_bdc_log WHERE msgtyp = space.
+    DELETE gt_bdc_log WHERE msgtyp <> 'E' AND msgtyp <> 'A'.
+
+    IF gt_bdc_log IS NOT INITIAL.
+      MESSAGE 'Error BDC' TYPE 'S' DISPLAY LIKE 'E'.
+      DATA(lv_error) = 'X'.
+    ENDIF.
+
+  ELSE.
+    MESSAGE 'Toc not created' TYPE 'S' DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+  IF lv_error IS INITIAL .
+
+    CALL FUNCTION 'TR_RELEASE_REQUEST'
+      EXPORTING
+        iv_trkorr                  = gv_toc_number
+        iv_display_export_log      = ''
+      EXCEPTIONS
+        cts_initialization_failure = 1
+        enqueue_failed             = 2
+        no_authorization           = 3
+        invalid_request            = 4
+        request_already_released   = 5
+        repeat_too_early           = 6
+        error_in_export_methods    = 7
+        object_check_error         = 8
+        docu_missing               = 9
+        db_access_error            = 10
+        action_aborted_by_user     = 11
+        export_failed              = 12
+        OTHERS                     = 13.
+    IF sy-subrc <> 0.
+      MESSAGE 'Error in Releasing TOC...!' TYPE 'S' DISPLAY LIKE 'E'.
+      LEAVE LIST-PROCESSING.
+    ELSE.
+
+      IF p_des = '/ZQDBM1/'.
+        rfc_dest = 'DE2200QE2430'.
+        gv_target_c = '400'.
+      ELSEIF p_des = '/ZQDBM2/'.
+        rfc_dest = 'DE2200QE2430'.
+        gv_target_c = '430'.
+      ELSEIF p_des = '/ZQDBM3/'.
+        rfc_dest = 'DE2200QE2430'.
+        gv_target_c = '450'.
+      ENDIF.
+
+      CALL FUNCTION 'ZTMS_UI_IMPORT_TR_REQUEST_NEW' DESTINATION rfc_dest
+        EXPORTING
+          iv_request = gv_toc_number
+          iv_tarcli  = gv_target_c.
+      IF sy-subrc <> 0.
+        MESSAGE 'Issue while importing ToC, please do it manually' TYPE 'S' DISPLAY LIKE 'E'.
+        LEAVE LIST-PROCESSING.
+      ENDIF.
+    ENDIF.
+  ENDIF.
