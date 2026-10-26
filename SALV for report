@@ -1,0 +1,45 @@
+TYPES: BEGIN OF ty_caption,
+         field  TYPE fieldname,
+         short  TYPE SCRTEXT_S,
+         medium TYPE SCRTEXT_M,
+         long   TYPE SCRTEXT_L,
+       END OF ty_caption.
+
+data:  go_alv   TYPE REF TO cl_salv_table,
+      lo_cols  TYPE REF TO cl_salv_columns_table,
+      lo_col   TYPE REF TO cl_salv_column_table,
+      lt_caps TYPE STANDARD TABLE OF ty_caption.
+TRY.
+      cl_salv_table=>factory(
+        IMPORTING
+          r_salv_table = go_alv
+        CHANGING
+          t_table      = lt_final
+      ).
+    CATCH cx_salv_msg INTO DATA(lx_msg).
+      MESSAGE lx_msg->get_text( ) TYPE 'E'.
+  ENDTRY.{"Message":"Deregistered failed","Status":"E"}
+
+  go_alv->get_display_settings( )->set_striped_pattern( abap_true ). " Zebra pattern
+  go_alv->get_functions( )->set_all( abap_true ).                  " Enable all toolbar functions
+  go_alv->get_columns( )->set optimize( abap_true ).                " Auto column width
+  lo_cols = go_alv->get_columns( ).
+ lo_cols->set_exception_column( 'LIGHT' ).                         "light signal 
+
+lt_caps = VALUE #(
+  ( field = 'LIGHT'     short = 'Ligh'   medium = 'Light'     long = 'Light' )
+  ( field = 'ORDER_NO'  short = 'ORD_NO' medium = 'ORDER_NO'  long = 'ORDER_NO' )
+  ( field = 'MESSAGE'   short = 'MSG'    medium = 'MESSAGE'   long = 'MESSAGE' )
+).
+
+LOOP AT lt_caps ASSIGNING FIELD-SYMBOL(<c>).
+  TRY.
+      lo_col ?= lo_cols->get_column( <c>-field ).
+      lo_col->set_short_text(  <c>-short  ).
+      lo_col->set_medium_text( <c>-medium ).
+      lo_col->set_long_text(  <c>-long   ).
+    CATCH cx_salv_not_found.
+  ENDTRY.
+ENDLOOP.
+
+  go_alv->display( ).
