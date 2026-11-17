@@ -1,0 +1,2473 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZCRMI_LEAD_DETAIL_SUB
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  FETCH_DATA_FROM_TABLE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fetch_data_from_table .
+  DATA : lv_date_low1(15)  TYPE c,
+         lv_date2(15)      TYPE c,
+         lv_date_high1(15) TYPE c.
+  DATA  :lv_date_low2(15)  TYPE c,
+         lv_date_high2(15) TYPE c.
+  DATA : lt_hse_usr TYPE zcrmt_ppm_orgunitid_ta,
+         lv_hse_pos TYPE objektid,
+         username   TYPE uname.
+  TYPES : BEGIN OF ty_object,
+            object_id TYPE crmd_orderadm_h-object_id,
+          END OF ty_object.
+  DATA : it_object TYPE TABLE OF ty_object,
+         ls_object LIKE LINE OF  it_object.
+* End of change of DM1K964930 }
+
+  IF gt_org IS NOT INITIAL OR call_flag = 'API_CALL'.
+    IF p_zone IS NOT INITIAL.
+      REPLACE ALL OCCURRENCES OF '*' IN p_zone WITH '%' IN CHARACTER MODE.                          "For Search all matching Records.
+      CONCATENATE 'ZO' ' = ' '''' p_zone ''''
+      INTO DATA(lv_where) RESPECTING BLANKS.
+    ENDIF.
+
+    IF p_reg IS NOT INITIAL.
+      REPLACE ALL OCCURRENCES OF '*' IN p_reg WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+      IF lv_where IS INITIAL.
+        CONCATENATE   'RO' ' = ' '''' p_reg ''''
+              INTO lv_where RESPECTING BLANKS.
+      ELSE.
+        CONCATENATE  lv_where ' AND ' 'RO' ' = '
+              '''' p_reg '''' INTO lv_where RESPECTING BLANKS.
+      ENDIF.
+    ENDIF.
+
+    IF p_area IS NOT INITIAL.
+      REPLACE ALL OCCURRENCES OF '*' IN p_area WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+      IF lv_where IS INITIAL.
+        CONCATENATE   'AO' ' = ' '''' p_area ''''
+              INTO lv_where RESPECTING BLANKS.
+      ELSE.
+        CONCATENATE  lv_where ' AND ' 'AO' ' = '
+              '''' p_area '''' INTO lv_where RESPECTING BLANKS.
+      ENDIF.
+    ENDIF.
+
+    IF p_so IS NOT INITIAL.
+      REPLACE ALL OCCURRENCES OF '*' IN p_so WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+      IF lv_where IS INITIAL.
+        CONCATENATE   'SO' ' = ' '''' p_so ''''
+              INTO lv_where RESPECTING BLANKS.
+      ELSE.
+        CONCATENATE  lv_where ' AND ' 'SO' ' = '
+              '''' p_so '''' INTO lv_where RESPECTING BLANKS.
+      ENDIF.
+    ENDIF.
+
+    IF p_zdo IS NOT INITIAL.
+      REPLACE ALL OCCURRENCES OF '*' IN p_zdo WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+      IF lv_where IS INITIAL.
+        CONCATENATE   'ZDO' ' = ' '''' p_zdo ''''
+              INTO lv_where RESPECTING BLANKS.
+      ELSE.
+        CONCATENATE  lv_where ' AND ' 'ZDO' ' = '
+              '''' p_zdo '''' INTO lv_where RESPECTING BLANKS.
+      ENDIF.
+    ENDIF.
+
+    IF p_mngr IS NOT INITIAL.
+      REPLACE ALL OCCURRENCES OF '*' IN p_mngr WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+      IF lv_where IS INITIAL.
+        CONCATENATE   'ZDO_M_BP' ' = ' '''' p_mngr ''''
+              INTO lv_where RESPECTING BLANKS.
+      ELSE.
+        CONCATENATE  lv_where ' AND ' 'ZDO_M_BP' ' = '
+              '''' p_mngr '''' INTO lv_where RESPECTING BLANKS.
+      ENDIF.
+    ENDIF.
+
+    IF p_exec IS NOT INITIAL.
+      REPLACE ALL OCCURRENCES OF '*' IN p_exec WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+      IF lv_where IS INITIAL.
+        CONCATENATE   'DIV_SE_BP' ' = ' '''' p_exec ''''
+              INTO lv_where RESPECTING BLANKS.
+      ELSE.
+        CONCATENATE  lv_where ' AND ' 'DIV_SE_BP' ' = '
+              '''' p_exec '''' INTO lv_where RESPECTING BLANKS.
+      ENDIF.
+    ENDIF.
+
+    DATA:gv_dstart TYPE sy-datum,
+         gv_dend   TYPE sy-datum.
+    IF s_cdate-low IS NOT INITIAL.
+      gv_dstart = s_cdate-low.
+    ELSE.
+      gv_dstart = '20160101'.
+    ENDIF.
+    IF s_cdate-high IS INITIAL.
+      gv_dend = sy-datum.
+    ELSE.
+      gv_dend = s_cdate-high.
+    ENDIF.
+
+    FREE : gt_org_d,
+           gt_org.
+*    CALL FUNCTION 'ZCRMRO_ORG_STRUCTURE_GET_SW'
+    CALL FUNCTION 'ZCRMRO_ORG_STRUCTURE_GET_REP'
+      EXPORTING
+        i_userid = sy-uname
+*       i_bdate  = '20160101'
+*       i_edate  = sy-datum
+      IMPORTING
+        e_org    = gt_org_d.
+
+    gt_org = gt_org_d.
+    SORT gt_org BY zdo zdo_m_bp div_se_bp.
+    DELETE ADJACENT DUPLICATES FROM gt_org COMPARING zdo zdo_m_bp div_se_bp.
+    LOOP AT gt_org INTO gs_org WHERE (lv_where).
+
+      s_sofc-low = gs_org-zdo.
+      s_sofc-option =  'EQ'.
+      s_sofc-sign =  'I'.
+      APPEND s_sofc TO s_sofc.
+      gs_org_x-zo_name = gs_org-zo_name.           " zone
+      gs_org_x-ro_name = gs_org-ro_name.         " region
+      gs_org_x-ao_name = gs_org-ao_name.           " area office
+      gs_org_x-so_name = gs_org-so_name.             " dealership
+      gs_org_x-zdo_name = gs_org-zdo_name.           " dealer outlet
+      gs_org_x-zdo      = gs_org-zdo.              " dealer outlet code
+      gs_org_x-zdo_m_name = gs_org-zdo_m_name.        " manager
+      gs_org_x-div_se_bp = gs_org-div_se_bp.         " exec id
+      gs_org_x-div_se_bp1 = gs_org-div_se_bp.         " exec id
+      gs_org_x-div_se_name = gs_org-div_se_name.       " executive
+      gs_org_x-zoutlet     = gs_org-zdo.                "Outlet
+      gs_org_x-zdo_objid   = gs_org-zdo_objid.
+      CONCATENATE 'O' gs_org_x-zdo_objid INTO           "Added by DM1K976745
+        gs_org_x-zdo_objid1 SEPARATED BY space.
+      APPEND gs_org_x TO gt_org_x.
+      CLEAR :gs_org_x,gs_org.
+    ENDLOOP.
+
+    SORT : s_sofc BY low.
+    DELETE ADJACENT DUPLICATES FROM s_sofc COMPARING low.
+
+    SELECT user_id,ao,zposition,vertical,zdo FROM zcrmt_alse_map INTO TABLE @DATA(lt_map) WHERE user_id = @sy-uname AND de_act NE 'X'.
+    IF sy-subrc EQ 0.
+      DATA(user_alse) = 'X'.
+      IF line_exists( lt_map[ zposition = 'AM' ] ).
+      ELSEIF line_exists( lt_map[ zposition = 'ASM' ] ).
+      ELSEIF line_exists( lt_map[ zposition = 'ALSE' ] ).
+        DATA: rt_alse_zdo TYPE RANGE OF zoutlet.
+        CLEAR rt_alse_zdo.
+        rt_alse_zdo = VALUE #( FOR alse_zdo IN lt_map ( sign = 'I' option = 'EQ' low = alse_zdo-zdo ) ).
+        DELETE gt_org_x WHERE zoutlet NOT IN rt_alse_zdo.
+      ENDIF.
+    ENDIF.
+
+    IF s_udate IS NOT INITIAL.
+
+      CLEAR : lv_date_low1, lv_date_high1.
+
+      CONVERT DATE s_udate-low TIME sy-timlo INTO TIME STAMP DATA(lv_date_low) TIME ZONE sy-zonlo.
+
+      CONVERT DATE s_udate-high TIME sy-timlo INTO TIME STAMP DATA(lv_date_high) TIME ZONE sy-zonlo.
+
+      lv_date_low1 = lv_date_low.
+      lv_date_high1 = lv_date_high.
+
+    ENDIF.
+
+    IF gt_verti IS NOT INITIAL.
+      DATA(rt_verti) = VALUE tt_verti( FOR lv_verti IN gt_verti ( sign = 'I' option = 'EQ'
+                                                                  low  = lv_verti-key ) ).
+      SELECT DISTINCT                                   "#EC CI_NOWHERE
+        a~segid ,
+        a~segnm AS seg,
+        c~vtext AS div,
+        c~spart AS division
+        FROM zcrmt_psegm_mstr AS a
+        INNER JOIN zcrmt_sg_pap_sap AS b ON b~psegid = a~segid
+        INNER JOIN tspat AS c ON c~spart = b~division
+        INTO TABLE @DATA(lt_seg)
+        WHERE c~spart IN @rt_verti AND c~spras = @sy-langu.
+      IF p_verti IS NOT INITIAL.
+        DELETE lt_seg WHERE division <> p_verti.
+        SORT lt_seg STABLE BY segid.
+        DELETE ADJACENT DUPLICATES FROM lt_seg COMPARING segid.
+      ENDIF.
+      DATA: ls_seg LIKE LINE OF lt_seg.
+      IF user_alse NE 'X'.
+        IF p_verti IS INITIAL.
+          ls_seg-segid = 'PS009'.
+          ls_seg-seg   = '4X2 SF HAULAGE'.
+          ls_seg-div   = 'Long Haulage'.
+          ls_seg-division = '40'.
+          APPEND ls_seg TO lt_seg.
+          CLEAR ls_seg.
+          ls_seg-segid = 'PS010'.
+          ls_seg-seg   = '4X2 SF TIPPER'.
+          ls_seg-div   = 'C&M'.
+          ls_seg-division = '50'.
+          APPEND ls_seg TO lt_seg.
+          CLEAR ls_seg.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    IF s_cdate IS NOT INITIAL AND s_udate IS NOT INITIAL.
+
+
+      IF s_cdate-high IS INITIAL.
+        lv_date_low2 =  s_cdate-low.
+        lv_date_high2 = s_cdate-high.
+      ENDIF.
+      IF s_cdate-low IS NOT INITIAL AND s_cdate-high IS NOT INITIAL .
+        lv_date_low2 =  s_cdate-low.
+        lv_date_high2 = s_cdate-high.
+      ENDIF.
+      CONCATENATE 'B~CRE_DATE' ' BETWEEN ' '''' lv_date_low2 '''' ' AND ' '''' lv_date_high2 '''' ' AND '
+*     CONCATENATE 'B~POSTING_DATE' ' BETWEEN ' '''' s_cdate-low '''' ' AND ' '''' s_cdate-high '''' ' AND '
+*                  'B~CHANGED_AT' ' BETWEEN ' '''' lv_date_low1 '''' ' AND ' '''' lv_date_high1 ''''
+                    'B~CH_DATE' ' BETWEEN ' '''' lv_date_low1 '''' ' AND ' '''' lv_date_high1 ''''
+      INTO DATA(lv_where1) RESPECTING BLANKS.
+
+    ELSEIF s_cdate IS NOT INITIAL AND s_udate IS INITIAL.
+
+      IF  s_cdate-low IS NOT INITIAL AND  s_cdate-high IS NOT INITIAL.
+
+        lv_date_low2 =  s_cdate-low.
+        lv_date_high2 = s_cdate-high.
+
+*        CONCATENATE  'B~POSTING_DATE' ' BETWEEN ' '''' s_cdate-low '''' ' AND ' '''' s_cdate-high ''''
+        CONCATENATE  'B~CRE_DATE' ' BETWEEN ' '''' lv_date_low2 '''' ' AND ' '''' lv_date_high2 ''''
+       INTO   lv_where1 RESPECTING BLANKS.
+      ELSE.
+        IF s_cdate-high IS INITIAL.
+*          CONCATENATE s_cdate-low '000001' INTO lv_date_low2.
+*          CONCATENATE s_cdate-low '235959' INTO lv_date_high2.
+          lv_date_low2 =  s_cdate-low.
+          lv_date_high2 = s_cdate-high.
+        ENDIF.
+*        CONCATENATE  'B~POSTING_DATE' ' EQ' '''' s_cdate-low ''''
+        CONCATENATE  'B~CRE_DATE' ' BETWEEN ' '''' lv_date_low2 '''' ' AND ' '''' lv_date_high2 ''''
+           INTO   lv_where1 RESPECTING BLANKS.
+      ENDIF.
+
+    ELSEIF s_cdate IS INITIAL AND s_udate IS NOT INITIAL.
+
+      IF s_udate-high IS INITIAL.
+*        CONCATENATE  'B~CHANGED_AT' ' BETWEEN ' '''' lv_date_low1+(08) '000000' '''' ' AND ' '''' lv_date_low1+(08) '235959' ''''
+*                 INTO   lv_where1 RESPECTING BLANKS.
+        CONCATENATE  'B~CH_DATE' ' BETWEEN ' '''' lv_date_low1+(08)  '''' ' AND ' '''' lv_date_low1+(08)  ''''
+                 INTO   lv_where1 RESPECTING BLANKS.
+      ELSE.
+        CONCATENATE  'B~CH_DATE' ' BETWEEN ' '''' lv_date_low1+(08)  '''' ' AND ' '''' lv_date_high1+(08)  ''''
+           INTO   lv_where1 RESPECTING BLANKS.
+*        CONCATENATE  'B~CHANGED_AT' ' BETWEEN ' '''' lv_date_low1+(08) '000000' '''' ' AND ' '''' lv_date_high1+(08) '235959' ''''
+*           INTO   lv_where1 RESPECTING BLANKS.
+      ENDIF.
+    ENDIF.
+* End of change of DM1K964930 }
+    IF p_zone IS NOT INITIAL OR p_reg IS NOT INITIAL OR p_area IS NOT INITIAL OR p_so IS NOT INITIAL OR p_so IS NOT INITIAL.
+      IF ( p_mngr IS NOT INITIAL ) OR ( p_exec IS NOT INITIAL ).
+        IF gt_org_x IS NOT INITIAL. "Added by logesh 28.08.2026
+          SELECT h~tel_number AS tel_no,
+                 b~order_no AS object_id,
+                 b~proc_type,
+                 b~emp_id   AS se,
+                 b~customer,
+                 b~psegid   AS segnm,
+                 b~proc_type AS process_type,
+                 b~plant AS sofc,
+                 b~ord_dt AS posting_date,
+                 b~origin AS origin,
+                 b~ch_date AS last_upd_date,
+                 b~stage,
+                 b~status,
+                 b~ord_qty  AS qty,              " qty
+                 b~hubid AS hub,
+                 b~apr_qty AS l_sale_q,
+                 p~zz_exp_sdate  AS exp_sale_dt,
+                 b~camp_id AS camp_id,
+                 g~mdesc,                              " Model DESC
+                 b~vpart AS prd,
+                 m~hubds AS hub_n,
+                 k~segnm AS seg_n,
+                 n~appnm AS sapp_n,
+                 n~sappid AS sapp,
+                 n~pappid AS pappid,
+                 l~appnm AS app_n,
+                 b~lp_type AS ltyp,
+                 q~description_20 AS ltyp_n,
+                 b~lp_name AS l_id,
+                 b~lp_source,
+                 x~description AS lp_srcd,
+                 r~type,
+                 r~name_last,
+                 r~name_first,
+                 r~name_org1,
+                 r~name_org2,
+                 d~partner,
+                 b~cre_date AS created_at,
+                 b~p_order,
+                 p~order_no AS  pros,
+                 p~ord_dt AS pro_cre,
+                 b~prmet,
+                 b~user_id
+          INTO TABLE @DATA(lt_dcr_lead_1)
+          FROM zcrm_order AS b
+          LEFT OUTER JOIN but020 AS d ON d~partner = b~customer
+          LEFT OUTER JOIN adr2 AS h ON h~addrnumber = d~addrnumber
+          LEFT OUTER JOIN zcrm_order AS p ON p~proc_type = 'ZAPR' AND p~p_order = b~order_no
+          LEFT OUTER JOIN zcrmt_hub_master AS m ON m~hubid =   b~hubid
+          LEFT OUTER JOIN zcrmt_psegm_mstr AS k ON k~segid =   b~psegid
+          LEFT OUTER JOIN zcrmt_sappl_mstr  AS n ON n~sappid = b~appid
+          LEFT OUTER JOIN zcrmt_pappl_mstr AS l ON l~appid =   n~pappid
+          LEFT OUTER JOIN zcrmt_model AS g ON b~model = g~modid
+          LEFT  OUTER JOIN zcrmc_source AS q ON q~source = b~lp_type
+          LEFT  OUTER JOIN zcrmc_source AS x ON x~source = b~lp_source
+          LEFT  OUTER JOIN but000 AS r ON r~partner = b~lp_name
+          FOR ALL ENTRIES IN @gt_org_x
+          WHERE b~emp_id = @gt_org_x-div_se_bp1(10)
+            AND  (lv_where1)                         " Added by DM1K964930
+            AND b~order_no IN @s_leadno
+            AND b~stage IN @s_stage "('001','002','003')
+            AND b~proc_type = 'ZALD'
+            AND b~customer IN @s_kunnr
+            AND b~plant = @gt_org_x-zdo+0(4)
+            AND h~tel_number IN @s_mobno
+            AND b~lp_type    IN @s_ltype               "#EC CI_BUFFJOIN
+            AND b~camp_id  IN @s_cid
+            AND b~status IN @s_stat
+            AND b~business NE 'PSB'.
+        ENDIF."Added by logesh 28.08.2026
+
+      ELSE.
+        IF gt_org_x IS NOT INITIAL. " Added by logesh 28.08.2026
+          SELECT h~tel_number AS tel_no,
+                 b~order_no AS object_id,
+                 b~proc_type,
+                 b~emp_id   AS se,
+                 b~customer,
+                 b~psegid   AS segnm,
+                 b~proc_type AS process_type,
+                 b~plant AS sofc,
+                 b~ord_dt AS posting_date,
+                 b~origin AS origin,
+                 b~ch_date AS last_upd_date,
+*         b~guid,
+                 b~stage,
+                 b~status,
+                 b~ord_qty  AS qty,              " qty
+                 b~hubid AS hub,
+                 b~apr_qty AS l_sale_q,
+                 p~zz_exp_sdate  AS exp_sale_dt,
+                 b~camp_id AS camp_id,
+                 g~mdesc,                              " Model DESC
+                 b~vpart AS prd,
+                 m~hubds AS hub_n,
+                 k~segnm AS seg_n,
+                 n~appnm AS sapp_n,
+                 n~sappid AS sapp,
+                 n~pappid AS pappid,
+                 l~appnm AS app_n,
+                 b~lp_type AS ltyp,
+                 q~description_20 AS ltyp_n,
+                 b~lp_name AS l_id,
+                 b~lp_source,
+                 x~description AS lp_srcd,
+                 r~type,
+                 r~name_last,
+                 r~name_first,
+                 r~name_org1,
+                 r~name_org2,
+                 d~partner,
+                 b~cre_date AS created_at,
+                 b~p_order,
+                 p~order_no AS  pros,
+                 p~ord_dt AS pro_cre,
+                 b~prmet,
+                 b~user_id
+          INTO TABLE @lt_dcr_lead_1
+          FROM zcrm_order AS b
+          LEFT OUTER JOIN but020 AS d ON d~partner = b~customer
+          LEFT OUTER JOIN adr2 AS h ON h~addrnumber = d~addrnumber
+          LEFT OUTER JOIN zcrm_order AS p ON p~proc_type = 'ZAPR' AND p~p_order = b~order_no
+          LEFT OUTER JOIN zcrmt_hub_master AS m ON m~hubid =   b~hubid
+          LEFT OUTER JOIN zcrmt_psegm_mstr AS k ON k~segid =   b~psegid
+          LEFT OUTER JOIN zcrmt_sappl_mstr  AS n ON n~sappid = b~appid
+          LEFT OUTER JOIN zcrmt_pappl_mstr AS l ON l~appid =   n~pappid
+          LEFT OUTER JOIN zcrmt_model AS g ON b~model = g~modid
+          LEFT  OUTER JOIN zcrmc_source AS q ON q~source = b~lp_type
+          LEFT  OUTER JOIN zcrmc_source AS x ON x~source = b~lp_source
+          LEFT  OUTER JOIN but000 AS r ON r~partner = b~lp_name
+          FOR ALL ENTRIES IN @gt_org_x
+          WHERE
+                   (lv_where1)                         " Added by DM1K964930
+            AND b~order_no IN @s_leadno
+            AND b~stage IN @s_stage "('001','002','003')
+            AND b~proc_type = 'ZALD'
+            AND b~customer IN @s_kunnr
+            AND h~tel_number IN @s_mobno
+            AND b~plant = @gt_org_x-zdo+0(4)
+            AND b~lp_type  IN @s_ltype                 "#EC CI_BUFFJOIN
+            AND b~camp_id  IN @s_cid " OR r~external_id IN @s_cid )
+            AND b~status IN @s_stat
+            AND b~business NE 'PSB'.
+        ENDIF. "Added by logesh 28.08.2026
+      ENDIF.
+    ELSE.
+      IF gt_org_x IS NOT INITIAL. "Added by logesh 28.08.2026
+        SELECT h~tel_number AS tel_no,
+               b~order_no AS object_id,
+               b~proc_type,
+               b~emp_id   AS se,
+               b~customer,
+               b~psegid   AS segnm,
+               b~proc_type AS process_type,
+               b~plant AS sofc,
+               b~ord_dt AS posting_date,
+               b~origin AS origin,
+*         b~cre_date AS last_upd_date,
+               b~ch_date AS last_upd_date,
+               b~stage,
+               b~status,
+               b~ord_qty  AS qty,              " qty
+               b~hubid AS hub,
+               b~apr_qty AS l_sale_q,
+               p~zz_exp_sdate  AS exp_sale_dt,
+               b~camp_id AS camp_id,
+               g~mdesc,                              " Model DESC
+               b~vpart AS prd,
+               m~hubds AS hub_n,
+               k~segnm AS seg_n,
+               n~appnm AS sapp_n,
+               n~sappid AS sapp,
+               n~pappid AS pappid,
+               l~appnm AS app_n,
+               b~lp_type AS ltyp,
+               q~description_20 AS ltyp_n,
+               b~lp_name AS l_id,
+               b~lp_source,
+               x~description AS lp_srcd,
+               r~type,
+               r~name_last,
+               r~name_first,
+               r~name_org1,
+               r~name_org2,
+               d~partner,
+               b~cre_date AS created_at,
+               b~p_order,
+               p~order_no AS  pros,
+               p~ord_dt AS pro_cre,
+               b~prmet,
+               b~user_id
+
+        INTO TABLE @lt_dcr_lead_1
+        FROM zcrm_order AS b
+        LEFT OUTER JOIN but020 AS d ON d~partner = b~customer
+        LEFT OUTER JOIN adr2 AS h ON h~addrnumber = d~addrnumber
+        LEFT OUTER JOIN zcrm_order AS p ON p~proc_type = 'ZAPR' AND p~p_order = b~order_no
+        LEFT OUTER JOIN zcrmt_hub_master AS m ON m~hubid =   b~hubid
+        LEFT OUTER JOIN zcrmt_psegm_mstr AS k ON k~segid =   b~psegid
+        LEFT OUTER JOIN zcrmt_sappl_mstr  AS n ON n~sappid = b~appid  "(legth mismatch)
+        LEFT OUTER JOIN zcrmt_pappl_mstr AS l ON l~appid =   n~pappid
+        LEFT OUTER JOIN zcrmt_model AS g ON b~model = g~modid
+        LEFT OUTER JOIN zcrmt_dcr_001 AS o ON o~object_id_l = b~order_no           "Added by Rajkumar After PROD
+        LEFT  OUTER JOIN zcrmc_source AS q ON q~source = b~lp_type
+        LEFT  OUTER JOIN zcrmc_source AS x ON x~source = b~lp_source
+        LEFT  OUTER JOIN but000 AS r ON r~partner = b~lp_name
+        LEFT OUTER JOIN zcrmt_llos_notif AS lo1
+          ON lo1~object_id = b~order_no
+        FOR ALL ENTRIES IN @gt_org_x
+        WHERE
+              (lv_where1)
+          AND b~order_no IN @s_leadno
+          AND b~stage IN @s_stage
+          AND b~proc_type = 'ZALD'
+          AND b~customer  IN @s_kunnr
+          AND h~tel_number IN @s_mobno
+          AND b~plant = @gt_org_x-zdo+0(4)
+          AND b~lp_type IN @s_ltype                    "#EC CI_BUFFJOIN
+          AND b~camp_id IN @s_cid
+          AND b~status IN @s_stat
+          AND b~business NE 'PSB'.
+      ENDIF."Added by logesh 28.08.2026
+    ENDIF.
+    DATA(lt_lead) = lt_dcr_lead_1[].
+    SORT : lt_dcr_lead_1 BY object_id.
+    DELETE ADJACENT DUPLICATES FROM lt_dcr_lead_1 COMPARING object_id.
+    IF lt_dcr_lead_1[] IS NOT INITIAL.
+
+      LOOP AT lt_dcr_lead_1 ASSIGNING FIELD-SYMBOL(<fs1>).
+        CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+          EXPORTING
+            input  = <fs1>-customer
+          IMPORTING
+            output = <fs1>-customer.
+        MOVE-CORRESPONDING <fs1> TO gs_lead.
+*        gs_lead-appln  = <fs1>-pappid.
+*        gs_lead-app_n  = <fs1>-app_n.
+*        gs_lead-sapp = <fs1>-sapp.
+*        gs_lead-sapp_n  = <fs1>-sapp_n.
+*        gs_lead-pros_id   = <fs1>-pros.
+*        gs_lead-pro_cre   = <fs1>-pro_cre.
+*        gs_lead-us_bp = <fs1>-se.
+*        gs_lead-par_lead_id = <fs1>-p_order.
+*        gs_lead-exp_sale_dt = <fs1>-exp_sale_dt.
+*        CONCATENATE <fs1>-name_first <fs1>-name_last INTO gs_lead-lnam SEPARATED BY space.
+        gs_lead-created_at = <fs1>-created_at.
+
+        gs_lead-camp_id = <fs1>-camp_id.
+
+
+        CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+          EXPORTING
+            input  = gs_lead-partner
+          IMPORTING
+            output = gs_lead-partner.
+
+        APPEND gs_lead TO lt_dcr_lead.
+        CLEAR gs_lead.
+      ENDLOOP.
+
+      IF lt_dcr_lead IS NOT INITIAL. "Added by logesh 28.08.2026
+        SELECT partner,
+               type,
+               name_first,
+               name_last,
+               name_org1,
+               name_org2
+          FROM but000
+          INTO TABLE @DATA(lead_but000)
+          FOR ALL ENTRIES IN @lt_dcr_lead
+          WHERE partner = @lt_dcr_lead-l_id+0(10)." AND type in ('2','1').
+
+        SELECT a~order_no,
+               b~object_id_l
+          INTO TABLE @DATA(it_lead_dcr)
+          FROM zcrm_order AS a
+          INNER JOIN zcrmt_pm_dcr_001 AS b
+            ON b~object_id_l = a~order_no
+          FOR ALL ENTRIES IN @lt_dcr_lead
+          WHERE a~order_no = @lt_dcr_lead-object_id.
+      ENDIF."Added by logesh 28.08.2026
+
+*begin of changes by tp_htl010108 on 23-01-2024  -dm1k990449
+      IF lt_dcr_lead IS NOT INITIAL.
+        SELECT a~order_no,
+               c~zloqty             "zz_lost_qty   Added by Rajkumar After PROD
+          FROM zcrm_order AS a
+*                                         inner join crmd_brelvonae as b1 on b1~objguid_a_sel = a~guid
+*                                         inner join crmd_orderadm_h as b on b~guid = b1~objguid_b_sel
+*                                         INNER JOIN zbtab00011a AS c ON c~order_no = a~order_no
+          INNER JOIN zcrmt_llos_notif AS c
+            ON c~object_id = a~order_no   "Added by Rajkumar After PROD
+          INTO TABLE @DATA(it_parent1)
+          FOR ALL ENTRIES IN @lt_dcr_lead
+          WHERE a~order_no = @lt_dcr_lead-object_id AND a~proc_type = 'ZALD' .
+      ENDIF.
+      IF it_parent1 IS NOT INITIAL.
+
+        SELECT a~order_no,
+               c~zloqty AS zz_lost_qty
+          FROM zcrm_order AS a         "zz_lost_qty   Added by Rajkumar After PROD
+*                                      INNER JOIN crmd_brelvonae AS b1 ON b1~objguid_b_sel = a~guid
+*                                      INNER JOIN crmd_orderadm_h AS b ON b~guid = b1~objguid_a_sel
+*                                      INNER JOIN zbtab00011a AS c ON c~order_no = a~order_no
+          INNER JOIN zcrmt_llos_notif AS c ON c~object_id = a~order_no   "Added by Rajkumar After PROD
+          INTO TABLE @DATA(it_parent2)
+          FOR ALL ENTRIES IN @it_parent1
+          WHERE a~order_no = @it_parent1-order_no AND a~proc_type = 'ZALD' .
+      ENDIF.
+
+      LOOP AT it_parent2 INTO DATA(ls_loss).
+        ls_lost-lead_no = ls_loss-order_no.
+        ls_lost-lost_qty = ls_loss-zz_lost_qty.
+        COLLECT ls_lost INTO it_lost.
+        CLEAR ls_lost.
+      ENDLOOP.
+
+      IF lt_dcr_lead IS NOT INITIAL.
+
+        SELECT zobj_id,
+               process_type,
+               time_stamp AS recent
+          FROM zcrmt_pm_nt_rms
+          INTO TABLE @DATA(it_data1)
+          FOR ALL ENTRIES IN @lt_dcr_lead
+          WHERE zobj_id EQ @lt_dcr_lead-object_id
+            AND process_type EQ 'ZALD'.
+
+        IF sy-subrc = 0.
+          SORT it_data1 BY zobj_id recent DESCENDING.
+          DELETE ADJACENT DUPLICATES FROM it_data1 COMPARING zobj_id.
+        ENDIF.
+*      ENDIF.
+*End of changes by TP_HTL010108 on 03-07-2024 TR-DM1K991970
+
+*      IF sy-subrc = 0.
+*        IF it_data1 IS NOT INITIAL.
+        SELECT zobj_id,
+               process_type,
+               zrmks,
+               zrmks_2
+          FROM zcrmt_pm_nt_rms INTO TABLE @DATA(it_rmks)
+          FOR ALL ENTRIES IN @it_data1
+          WHERE zobj_id = @it_data1-zobj_id AND process_type = @it_data1-process_type
+            AND time_stamp = @it_data1-recent.
+*        ENDIF.
+        IF sy-subrc = 0.
+          DELETE it_rmks WHERE zrmks IS INITIAL.
+          SORT it_rmks BY zobj_id.
+        ENDIF.
+
+      ENDIF.
+**********************************************************************
+**********************************************************************
+      IF lt_dcr_lead IS NOT INITIAL.  " Added by logesh 28.08.2026
+        SELECT object_id , process_type , zlikely_purnxt FROM zcrmt_llos_notif INTO TABLE @DATA(it_like_p) FOR ALL ENTRIES IN @lt_dcr_lead
+            WHERE object_id =  @lt_dcr_lead-object_id AND process_type = 'ZALD'.
+
+**********************************************************************
+
+        SELECT DISTINCT partner , mc_name1 AS cust_f, mc_name2 AS cust_l
+      FROM but000 INTO TABLE @DATA(lt_cust_name) FOR ALL ENTRIES IN @lt_dcr_lead
+      WHERE partner = @lt_dcr_lead-customer.
+
+        SELECT DISTINCT partner,name_first AS mc_name1, name_last AS mc_name2
+         FROM but000 INTO TABLE @DATA(lt_se_names)
+         FOR ALL ENTRIES IN @lt_dcr_lead
+         WHERE partner = @lt_dcr_lead-se(10).
+
+*      SELECT objid,sobid FROM hrp1001 INTO TABLE @DATA(lt_hrp1001) FOR ALL ENTRIES IN @lt_dcr_lead
+*        WHERE objid = @lt_dcr_lead-us_bp
+*              AND otype = 'CP' AND sclas = 'US'.
+
+        SELECT usrid,
+                pernr FROM zdbmt_user INTO TABLE @DATA(lt_usr).
+
+
+        SELECT DISTINCT
+          a~partner,
+          a~addrnumber,
+          b~tel_number,                        " customer phone no
+          c~city1,                            " city
+          c~city2,                            " district
+          c~post_code1,                       " postal code
+          c~street,                           " street
+          c~house_num1,                       " house no
+          c~str_suppl1,                       " street 1
+          c~str_suppl2,                       " street 2
+          c~str_suppl3,                       " street 3
+          d~bezei AS region                  " region
+
+       FROM but020 AS a
+       INNER JOIN adrc AS c
+       ON c~addrnumber = a~addrnumber
+       LEFT OUTER JOIN adr2 AS b
+       ON b~addrnumber = a~addrnumber
+       LEFT OUTER JOIN  t005u AS d                     "#EC CI_BUFFJOIN
+       ON d~land1 = c~country AND d~bland = c~region AND d~spras = @sy-langu
+       INTO TABLE @DATA(lt_tel)
+       FOR ALL ENTRIES IN @lt_dcr_lead
+       WHERE a~partner = @lt_dcr_lead-customer AND
+             b~r3_user IN ('3','1') AND b~tel_number IN @s_mobno.
+
+
+
+        READ TABLE gt_org_d INTO DATA(gs_org_m) WITH KEY zposition = 'Dealer Sales Manager'.
+        IF sy-subrc = 0.
+          READ TABLE gt_org_d INTO DATA(gs_org_mgmt) WITH KEY zposition = 'Management'.
+          IF sy-subrc NE 0.
+            DELETE gt_org_d WHERE zposition <> 'Dealer Sales Manager'.
+            DATA(dsm_flg) = 'X'.
+          ENDIF.
+        ENDIF.
+
+        SELECT DISTINCT
+         y1~zzbfld00009u AS se,
+         y2~name_last AS mlast,
+         y2~name_first AS mfirst
+
+       FROM zbtab0000r3 AS y1                                               " to fetch mngr name
+       INNER JOIN but000 AS y2
+       ON y2~partner = y1~zzbfld00009v
+       INTO TABLE @DATA(lt_mngr)
+       FOR ALL ENTRIES IN @lt_dcr_lead
+       WHERE y1~zzbfld00009u = @lt_dcr_lead-se(10) AND zinact = ''.
+        SELECT a~zzbfld00009m, a~zzbfld00009n, a~zzbfld00009s , a~zzbfld00009u, a~zzbfld00009v, b~mc_short,
+          c~name_last AS mlast,c~name_first AS mfirst
+         INTO TABLE @DATA(lt_mngr_end)
+         FROM zbtab0000r3 AS a
+          INNER JOIN hrp1000 AS b ON a~zzbfld00009s = b~otjid
+          INNER JOIN but000 AS c ON c~partner = a~zzbfld00009v
+           FOR ALL ENTRIES IN @lt_dcr_lead
+          WHERE  a~zzbfld00009u = @lt_dcr_lead-se(10)
+           AND a~zinact = 'X'
+           AND b~otype = 'O' AND b~endda GT @sy-datum.
+      ENDIF. " Added by logesh 28.08.2026
+
+*start of changes by tp_tcs010007 on 21.06.2021
+      IF lt_dcr_lead_1 IS NOT INITIAL. " Added by logesh 28.08.2026
+        SELECT  object_id AS order_no, zzbfld00003n AS zz_comp_model   "Added by Rajkumar After PROD
+           FROM zcrmt_llos_notif        "zbtab00011a "Added by Rajkumar After PROD
+           INTO TABLE @DATA(lt_lla)
+                 FOR ALL ENTRIES IN @lt_dcr_lead_1
+                 WHERE object_id = @lt_dcr_lead_1-object_id.    "order_no  "Added by Rajkumar After PROD
+      ENDIF." Added by logesh 28.08.2026
+      IF lt_lla[] IS NOT INITIAL.
+        SORT lt_lla BY order_no.
+        SELECT modid,make FROM zcrmt_comp_mod
+          INTO TABLE @DATA(lt_mod)
+          FOR ALL ENTRIES IN @lt_lla
+          WHERE modid = @lt_lla-zz_comp_model.
+      ENDIF.
+*if lt_dcr_lead_1 is not INITIAL.
+      SELECT a~ztransid,
+               a~object_id,
+               a~process_type,
+               a~zllos_flag,
+               a~zzbfld0000a9,
+               b~codegruppe AS c1,
+               b~kurztext AS reason1,
+               c~ztransid AS ztrans_01,
+               c~object_id AS zobj_01
+              FROM zcrmt_pm_notf_01 AS c
+              INNER JOIN zcrmt_llos_notif AS a
+              ON a~ztransid = c~ztransid
+               INNER JOIN zqpct AS b
+               ON b~code = a~zzbfld0000a9
+               INTO TABLE @DATA(lt_reason)
+               FOR ALL ENTRIES IN @lt_dcr_lead_1
+               WHERE c~object_id = @lt_dcr_lead_1-object_id AND
+                     c~znotif_status IN ( '2', 'D' ) AND
+                     c~znotif_type  = '8' AND
+                     c~zstrip = 'LLOS' AND
+                     a~process_type = @lt_dcr_lead_1-process_type AND
+                     a~zllos_flag = '1' AND
+                     b~codegruppe IN ('ZCOMPREA','ZCODEALR') AND
+                     b~sprache EQ 'E'.
+
+
+      SELECT a~ztransid,
+             a~object_id,
+             a~process_type,
+             a~zllos_flag,
+             a~zzbfld0000a9,
+             a~zzbfld0000a9_1,
+             b~codegruppe AS c2,
+             b~kurztext AS reason2,
+             c~ztransid AS ztrans_01,
+             c~object_id AS zobj_01
+             FROM zcrmt_pm_notf_01 AS c
+             INNER JOIN zcrmt_llos_notif AS a
+             ON a~ztransid = c~ztransid
+             INNER JOIN zqpct AS b
+             ON b~code = a~zzbfld0000a9_1
+             INTO TABLE @DATA(lt_reason1)
+             FOR ALL ENTRIES IN @lt_dcr_lead_1
+             WHERE c~object_id = @lt_dcr_lead_1-object_id AND
+                   c~znotif_status IN ( '2', 'D' ) AND
+                   c~znotif_type  = '8' AND
+                   c~zstrip = 'LLOS' AND
+                   a~process_type = @lt_dcr_lead_1-process_type AND
+                   a~zllos_flag = '1' AND
+                   b~codegruppe IN ('ZCOMPREA','ZCODEALR') AND
+                   b~sprache EQ 'E'.
+
+*        End of changes by tp_tcs010007 on 21.06.2021
+    ENDIF.
+*    endif.
+    FREE gt_final.
+
+    SORT : lt_mngr BY se,lt_mngr_end BY zzbfld00009u , lt_tel BY partner , lt_cust_name BY partner , lt_se_names BY partner ,
+          lt_usr BY pernr,.
+    DATA(gt_org_x1) = gt_org_x.
+    SORT gt_org_x BY div_se_bp1.
+    SORT gt_org_x1 BY zdo.
+
+
+    SELECT b~lead_id,
+           a~lead_prov_type,
+           a~lead_prov_id,
+           a~lead_prov_mob,
+           a~lead_prov_nam
+      FROM zcrmt_enqry_det AS a
+      INNER JOIN zcrmt_enqry_proc AS b
+        ON a~enq_id EQ b~enq_id
+      FOR ALL ENTRIES IN @lt_dcr_lead
+      WHERE b~lead_id EQ @lt_dcr_lead-object_id
+      INTO TABLE @DATA(it_det).
+
+*End of changes by TP_HTL010108 on 03-07-2024 TR-DM1K991970
+
+    SORT it_det BY lead_id.
+    DELETE it_det WHERE lead_id IS INITIAL.                                                   "added by TP_HTL010108 on 12.01.2024
+    DELETE ADJACENT DUPLICATES FROM it_det COMPARING lead_id.                                 "added by TP_HTL010108 on 12.01.2024
+* End of changes by TP_HTL010108 on 02.07.2023 - DM1K988884
+
+    DATA : n_date TYPE sy-datum.
+
+*    IF lt_lead IS NOT INITIAL.
+*      DELETE lt_lead WHERE camp_id1 IS INITIAL.
+*      SORT lt_lead BY actualstart.
+*    ENDIF.
+    IF it_lead_dcr[] IS NOT INITIAL.
+      SORT it_lead_dcr BY order_no.
+    ENDIF.
+*Begin of changes TL_HTL206580(Alsadh)
+    IF lt_dcr_lead IS NOT INITIAL. "Added by logesh 28.08.2026
+      SELECT a~object_id,
+             a~process_type,
+             a~zloqty AS lost_qty,
+             a~zllqty AS likly_lost_qty,
+             a~zlsqty AS likly_sale,
+             a~zllos_flag,
+             a~zzbfld0000a9 AS reason1,
+             a~zzbfld0000a9_1 AS reason2,
+             a~zzbfld000090 AS competitor_name,
+             a~zlikely_purnxt AS month
+        FROM zcrmt_llos_notif AS a
+        INNER JOIN zcrmt_pm_notf_01 AS b ON b~ztransid = a~ztransid
+        INTO TABLE @DATA(lt_llqty)
+        FOR ALL ENTRIES IN @lt_dcr_lead
+        WHERE a~object_id = @lt_dcr_lead-object_id
+          AND a~process_type = 'ZALD'
+          AND b~znotif_status IN ( '2' , 'D' )."Added by TP_HTL206580
+      IF sy-subrc = 0.
+        SORT lt_llqty BY object_id ASCENDING zllos_flag DESCENDING.        "Added by TP_HTL206580
+        DELETE ADJACENT DUPLICATES FROM lt_llqty COMPARING object_id.
+      ENDIF.
+*Reason lost qty
+      SELECT * FROM zqpct  INTO TABLE @DATA(lt_zqpct) .
+
+*Checking the parent id
+      SELECT order_no,
+             proc_type
+        FROM zcrm_order
+        INTO TABLE @DATA(c_parent)
+        FOR ALL ENTRIES IN @lt_dcr_lead
+        WHERE order_no = @lt_dcr_lead-p_order AND proc_type = 'ZALD'.
+
+*Fetching camp desc
+      SELECT external_id,
+             text1
+        FROM zcrmt_campaign
+        INTO TABLE @DATA(lt_campdesc)
+        FOR ALL ENTRIES IN @lt_dcr_lead
+        WHERE external_id = @lt_dcr_lead-camp_id.
+
+*Orgin
+      SELECT lead_id
+        FROM zcrmt_enqry_proc
+        INTO TABLE @DATA(lt_ho)
+        FOR ALL ENTRIES IN @lt_dcr_lead
+        WHERE lead_id = @lt_dcr_lead-object_id.
+*END of changes TL_HTL206580(Alsadh)
+    ENDIF.       "Added by logesh 28.08.2026
+
+    LOOP AT lt_dcr_lead INTO DATA(gs_lead).
+      CLEAR gs_final.
+      IF dsm_flg = 'X'.
+
+        READ TABLE gt_org_d INTO DATA(gs_mngr) WITH KEY div_se_bp = gs_lead-se(10).
+        IF sy-subrc <> 0.
+          CONTINUE.
+        ENDIF.
+      ENDIF.
+
+      READ TABLE gt_org_x1 INTO gs_org_x WITH KEY zdo = gs_lead-sofc BINARY SEARCH.
+      IF sy-subrc = 0.
+
+        gs_final-zone = gs_org_x-zo_name.           " zone
+        gs_final-region = gs_org_x-ro_name.         " region
+        gs_final-area = gs_org_x-ao_name.           " area office
+        gs_final-so = gs_org_x-so_name.             " dealership
+        gs_final-zdo = gs_org_x-zdo_name.           " dealer outlet
+        gs_final-zdo_code = gs_org_x-zdo.           " dealer outlet code
+
+        gs_final-prd  = gs_lead-prd.
+        gs_final-vqty = gs_lead-qty.
+
+        READ TABLE lt_mngr INTO DATA(ls_mngr) WITH KEY se = gs_lead-se(10) BINARY SEARCH.
+        IF sy-subrc = 0.
+          IF gs_final-mngr IS INITIAL.
+            CLEAR : gv_mname.
+            CONCATENATE ls_mngr-mfirst ls_mngr-mlast INTO gv_mname SEPARATED BY ''.
+            gs_final-mngr = gv_mname.
+          ENDIF.
+        ELSE.
+          DATA(dl_flag) = 'X'.                           " mngr name
+        ENDIF.
+        READ TABLE lt_se_names INTO DATA(ls_se_names) WITH KEY partner = gs_lead-se(10) BINARY SEARCH.
+        IF  sy-subrc = 0.
+          TRANSLATE ls_se_names-mc_name2 TO LOWER CASE.
+          TRANSLATE ls_se_names-mc_name2(1) TO UPPER CASE.
+          TRANSLATE ls_se_names-mc_name1 TO LOWER CASE.
+          TRANSLATE ls_se_names-mc_name1(1) TO UPPER CASE.
+
+          CONCATENATE ls_se_names-mc_name2 ls_se_names-mc_name1 INTO DATA(lv_se_name) SEPARATED BY space.
+
+          gs_final-exec = lv_se_name.
+          IF dl_flag IS NOT INITIAL.
+            gs_final-mngr = lv_se_name.
+          ENDIF.
+        ENDIF.
+
+*        lv_per_id = gs_lead-se.
+*        lv_pernr = gs_lead-se+2(10).
+*        READ TABLE lt_usr INTO DATA(ls_usr) WITH KEY usrid = lv_pernr.
+*        IF sy-subrc = 0.
+        gs_final-srcno = gv_uname = gs_lead-user_id.
+*          CLEAR : lv_pernr.
+*        ENDIF.
+        gs_final-object_id = gs_lead-object_id.                " lead no
+*        gs_final-desc = gs_lead-description.                   " lead name      NE
+        gs_final-customer = gs_lead-customer.                  " party no
+        gs_final-qty = gs_lead-qty.                           " qty
+        lv_date2 = gs_lead-created_at.
+        gs_final-stage = gs_lead-stage.
+        CASE gs_lead-status.
+          WHEN 'E0002'  .
+            gs_final-status = 'In process'.
+          WHEN 'E0003'.
+            gs_final-status = 'Converted To Prospect'.
+          WHEN 'E0004'.
+            gs_final-status = 'Closed'.
+          WHEN 'E0007'.
+            gs_final-status = 'Dead'.
+          WHEN 'E0008'.
+            gs_final-status = 'Likely Sales'.
+          WHEN 'E0013'.
+            gs_final-status = 'Lost'.
+          WHEN 'E0014'.
+            gs_final-status = 'Deferred'.
+          WHEN 'E0015'.
+            gs_final-status = 'Likely Lost'.
+        ENDCASE.
+
+        "Added by TP_HTL206580(Alsadh) 21.09.2026 09:50:29
+        gs_final-prmet = gs_lead-prmet.
+
+        CONCATENATE  lv_date2+0(4)  lv_date2+4(2)  lv_date2+6(2) INTO gs_final-posting_date.
+        CLEAR lv_date2.
+
+        gs_final-segnm = gs_lead-segnm.                " PRISM Segment
+        gs_final-seg_n = gs_lead-seg_n.
+        gs_final-hub = gs_lead-hub.                    " hub
+        gs_final-hub_n = gs_lead-hub_n.
+        gs_final-appln = gs_lead-pappid.                " appln
+*        gs_final-appl
+        gs_final-app_n = gs_lead-app_n.
+        gs_final-sapp_n = gs_lead-sapp_n.
+        gs_final-sapp = gs_lead-sapp.
+
+        READ TABLE c_parent INTO DATA(ls_cparent) WITH KEY order_no = gs_lead-p_order proc_type = 'ZALD'. "added by TP_HTL206580(Alsadh)
+        IF sy-subrc = 0.
+          gs_final-par_lead_id = gs_lead-p_order.
+        ENDIF.
+
+        READ TABLE it_rmks INTO DATA(ls_rmks) WITH KEY zobj_id = gs_lead-object_id BINARY SEARCH.
+        IF sy-subrc = 0.
+          gs_final-rmark = ls_rmks-zrmks.
+          gs_final-rmark1 = ls_rmks-zrmks_2.
+        ENDIF.
+*        endif.
+        CLEAR : gv_cust.
+        READ TABLE lt_cust_name INTO DATA(ls_cust_name) WITH KEY partner = gs_lead-customer BINARY SEARCH.
+        IF sy-subrc = 0.
+          CONCATENATE ls_cust_name-cust_f ls_cust_name-cust_l INTO gv_cust SEPARATED BY ''.
+          gs_final-cname = gv_cust.
+        ENDIF.
+        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""" Start by Aditya Bodala
+        gs_final-emp_id = gs_lead-se.                 " emp no
+        gs_final-mdesc = gs_lead-mdesc.                 " model desc
+*        IF gs_lead-last_upd_date ne '00000000'.
+        lv_last_upd_date = gs_lead-last_upd_date.
+        gs_final-last_upd_date = lv_last_upd_date+0(8). " Last updated date
+        IF gs_final-last_upd_date IS INITIAL OR gs_final-last_upd_date EQ ' '.
+          gs_final-last_upd_date = gs_lead-posting_date.    " TP_HTL206580(Alsadh)
+        ENDIF.
+        READ TABLE lt_tel INTO DATA(ls_tel1) WITH KEY partner = gs_lead-customer BINARY SEARCH."addrnumber = gs_lead-addrnumber.
+        IF sy-subrc = 0.
+          gs_final-tel_number = ls_tel1-tel_number.              " customer phone no
+
+          CONCATENATE ls_tel1-house_num1 ls_tel1-street ls_tel1-str_suppl1
+                  ls_tel1-str_suppl2 ls_tel1-str_suppl3 ls_tel1-city1
+                  ls_tel1-city2 ls_tel1-region ls_tel1-post_code1 INTO gv_addr SEPARATED BY ''.
+
+          gs_final-addr = gv_addr.                                  " address
+
+          IF NOT ls_tel1-tel_number IS INITIAL.
+            gs_final-tel_number = gs_lead-tel_no.
+          ENDIF.
+        ENDIF.
+
+        gs_final-ltyp  = gs_lead-ltyp.
+        gs_final-l_id = gs_lead-l_id.
+        gs_final-ltyp_n = gs_lead-ltyp_n.
+        gs_final-source = COND #( WHEN gs_lead-ltyp = '01'
+                                                  THEN 'PRISM 2.O Mobile App'
+                                                  ELSE  gs_lead-lp_srcd ).
+        IF gs_final-source IS INITIAL.
+          gs_final-source = 'PRISM 2.O Mobile App'.
+
+        ENDIF.
+        gs_final-lnam = COND #( WHEN gs_lead-ltyp = '01' THEN gs_final-exec
+                                 ELSE space ).
+
+        IF gs_final-lnam IS INITIAL.
+
+          gs_final-lnam = COND #( WHEN gs_lead-type = '1' THEN |{ gs_lead-name_first } { gs_lead-name_last }|
+                                                             ELSE |{ gs_lead-name_org1 } { gs_lead-name_org2 }| ).
+
+        ENDIF.
+
+
+
+* Begin of changes by TP_HTL010108 on 02.07.2023 - DM1K988884
+*        gs_final-ltyp  = gs_lead-ltyp.
+*        gs_final-l_id = gs_lead-l_id.
+*        IF gs_final-ltyp EQ '38'.
+*          READ TABLE it_det INTO DATA(ls_det) WITH KEY lead_id = gs_lead-object_id.
+*          gs_final-ltyp_n = ls_det-lead_prov_type.
+*          gs_final-source = gs_lead-ltyp_n.
+*          IF ls_det-lead_prov_id EQ space.
+**            "Begin of chnages by tp_tcs010016 on 11/01/2024
+*            SELECT SINGLE a~partner,c~name1_text,c~name_org1,c~title FROM but020 AS a INNER JOIN adr2 AS b ON a~addrnumber EQ b~addrnumber
+*            INNER JOIN but000 AS c ON c~partner EQ a~partner
+*            INNER JOIN but100 AS d ON d~partner EQ a~partner
+*            INNER JOIN tb003t AS h ON h~role EQ d~rltyp
+*            WHERE b~tel_number EQ @ls_det-lead_prov_mob AND c~xblck NE 'X' INTO @DATA(ls_telenum).
+**            "End of changes by tp_tcs010016 on 11/01/2024
+*            IF ls_telenum-title EQ '003'.
+*              gs_final-l_id = ls_telenum-partner.
+*              gs_final-lnam = ls_telenum-name_org1.
+*            ELSE.
+*              gs_final-l_id = ls_telenum-partner.
+*              gs_final-lnam = ls_telenum-name1_text.
+*            ENDIF.
+*          ENDIF.
+*        ELSE.
+**          gs_final-ltyp_n = gs_lead-ltyp_n. "Commented By TP_HTL206580(Alsadh) on 24.09.2026 10:59:16
+**          gs_final-source = gs_lead-ltyp_n.
+*
+*          gs_final-l_id = gs_lead-se(10).
+*          READ TABLE lt_cust_name INTO DATA(ls_cust_name2) WITH KEY partner = gs_final-l_id  BINARY SEARCH.
+*          IF sy-subrc = 0.
+*            CONCATENATE ls_cust_name2-cust_f ls_cust_name2-cust_l INTO gv_cust2 SEPARATED BY ''.
+*            gs_final-lnam = gv_cust2.
+*          ENDIF.
+*        ENDIF.
+*        IF gs_final-lnam IS INITIAL.
+*          READ TABLE lead_but000 INTO DATA(wa_but000) WITH KEY partner = gs_lead-partner.
+*          IF sy-subrc = 0.
+*            CONCATENATE wa_but000-name_first wa_but000-name_last INTO gs_final-lnam SEPARATED BY space.
+*            IF gs_final-lnam  IS INITIAL.
+*              CONCATENATE wa_but000-name_org1 wa_but000-name_org2 INTO gs_final-lnam SEPARATED BY space.
+*            ENDIF.
+*          ELSE.
+*            gs_final-lnam = |{ gs_lead-name_first } { gs_lead-name_last }|.
+*          ENDIF.
+*        ENDIF.
+
+        READ TABLE lt_llqty INTO DATA(ls_llqty) WITH KEY object_id = gs_final-object_id process_type = gs_lead-process_type.
+        IF sy-subrc = 0.
+          gs_final-l_sale_q = ls_llqty-likly_sale.
+          gs_final-l_lost_q = ls_llqty-likly_lost_qty.
+          gs_final-lost_q = ls_llqty-lost_qty.
+
+*reason lost qty
+          IF ls_llqty-zllos_flag = '2'.
+            IF ls_llqty-competitor_name = 'M01'.
+              READ TABLE lt_zqpct INTO DATA(ls_zqpct) WITH KEY code = ls_llqty-reason1 codegruppe = 'ZCODEALR'.
+              IF sy-subrc = 0.
+                gs_final-reason1 = ls_zqpct-kurztext.
+              ENDIF.
+              READ TABLE lt_zqpct INTO ls_zqpct WITH KEY code = ls_llqty-reason2 codegruppe = 'ZCODEALR'.
+              IF sy-subrc = 0.
+                gs_final-reason2 = ls_zqpct-kurztext.
+              ENDIF.
+            ELSE.
+              READ TABLE lt_zqpct INTO ls_zqpct WITH KEY code = ls_llqty-reason1 codegruppe = 'ZCOMPREA'.
+              IF sy-subrc = 0.
+                gs_final-reason1 = ls_zqpct-kurztext.
+              ENDIF.
+              READ TABLE lt_zqpct INTO ls_zqpct WITH KEY code = ls_llqty-reason2 codegruppe = 'ZCOMPREA'.
+              IF sy-subrc = 0.
+                gs_final-reason2 = ls_zqpct-kurztext.
+              ENDIF.
+            ENDIF.
+          ELSEIF ls_llqty-zllos_flag = '1'.
+            READ TABLE lt_zqpct INTO  ls_zqpct WITH KEY code = ls_llqty-reason1 katalogart = 'ZL'.
+            IF sy-subrc = 0.
+              gs_final-reason1 = ls_zqpct-kurztext.
+            ENDIF.
+            READ TABLE lt_zqpct INTO  ls_zqpct WITH KEY code = ls_llqty-reason2 katalogart = 'ZL'.
+            IF sy-subrc = 0.
+              gs_final-reason2 = ls_zqpct-kurztext.
+            ENDIF.
+          ELSEIF ls_llqty-zllos_flag = '3'.
+            READ TABLE lt_zqpct INTO  ls_zqpct WITH KEY code = ls_llqty-reason1 katalogart = 'ZCLOSDEF'.
+            IF sy-subrc = 0.
+              gs_final-reason1 = ls_zqpct-kurztext.
+            ENDIF.
+            READ TABLE lt_zqpct INTO  ls_zqpct WITH KEY code = ls_llqty-reason2 katalogart = 'ZCLOSDEF'.
+            IF sy-subrc = 0.
+              gs_final-reason2 = ls_zqpct-kurztext.
+            ENDIF.
+          ENDIF.
+          IF gs_final-status = 'Closed' OR gs_final-status = 'Deferred' .
+            CALL FUNCTION 'ZCRM_HK_ADD_MONTH_TO_DATE'
+              EXPORTING
+                months  = ls_llqty-month
+                olddate = gs_lead-last_upd_date
+              IMPORTING
+                newdate = n_date.
+
+            IF n_date IS NOT INITIAL.
+              gs_final-like_m = n_date+4(2).
+              gs_final-like_y = n_date+0(4).
+            ENDIF.
+          ENDIF.
+        ENDIF.
+*      ENDIF .
+        gs_final-exp_sale_dt = gs_lead-exp_sale_dt.
+        gs_final-camp_id = gs_lead-camp_id.
+        IF gs_final-camp_id IS INITIAL.
+          READ TABLE lt_lead INTO DATA(ls_camp) WITH KEY object_id = gs_final-object_id.
+          IF sy-subrc = 0.
+            gs_final-camp_id = ls_camp-camp_id.
+*            gs_final-camp_des1 = ls_camp-camp_des1.
+          ENDIF.
+
+        ENDIF.
+        READ TABLE lt_campdesc INTO DATA(ls_campdesc) WITH KEY external_id = gs_final-camp_id.
+        IF sy-subrc = 0.
+          gs_final-camp_des1 = ls_campdesc-text1.
+        ENDIF.
+
+        gs_final-prosid = gs_lead-pros.
+        gs_final-pdate  = gs_lead-pro_cre.
+
+        READ TABLE lt_ho INTO DATA(ls_ho) WITH KEY lead_id = gs_lead-object_id.
+        IF sy-subrc = 0 .
+          gs_final-origin = 'HO Leads'.
+        ELSE .
+          gs_final-origin = 'PRISM 2.0 App'.
+        ENDIF.
+
+        IF dsm_flg = 'X'.
+          gs_final-mngr = gs_mngr-zdo_m_name.
+        ENDIF.
+
+        IF user_alse NE 'X'.
+          IF gs_lead-segnm IS INITIAL.
+            APPEND gs_final TO gt_final.
+          ELSE.
+            IF line_exists( lt_seg[ segid = gs_lead-segnm ] ).
+              APPEND gs_final TO gt_final.
+            ENDIF.
+          ENDIF.
+        ELSE.
+          IF line_exists( lt_seg[ segid = gs_lead-segnm ] ).
+            APPEND gs_final TO gt_final.
+          ENDIF.
+        ENDIF.
+
+        CLEAR gs_final.
+
+      ELSE.
+        READ TABLE gt_org_x1 INTO gs_org_x WITH KEY div_se_bp1 = gs_lead-se.
+
+*        IF sy-subrc = 0.
+        gs_final-zone = gs_org_x-zo_name.           " zone
+        gs_final-region = gs_org_x-ro_name.         " region
+        gs_final-area = gs_org_x-ao_name.           " area office
+        gs_final-so = gs_org_x-so_name.             " dealership
+        gs_final-zdo = gs_org_x-zdo_name.           " dealer outlet
+        gs_final-zdo_code = gs_lead-sofc.           " dealer outlet code
+
+        gs_final-ltyp_n = gs_lead-ltyp_n.
+        gs_final-source = COND #( WHEN gs_lead-ltyp = '01'
+                                                 THEN 'PRISM 2.O Mobile App'
+                                                 ELSE  gs_lead-lp_srcd ).
+
+        IF gs_final-source IS INITIAL.
+          gs_final-source = 'PRISM 2.O Mobile App'.
+
+        ENDIF.
+
+        gs_final-lnam = COND #( WHEN gs_lead-ltyp = '01' THEN gs_final-exec
+                                 ELSE space ).
+
+        IF gs_final-lnam IS INITIAL.
+
+          gs_final-lnam = COND #( WHEN gs_lead-type = '1' THEN |{ gs_lead-name_first } { gs_lead-name_last }|
+                                                             ELSE |{ gs_lead-name_org1 } { gs_lead-name_org2 }| ).
+
+        ENDIF.
+
+*        gs_final-l_id = gs_lead-se(10).
+        gs_final-l_id = gs_lead-l_id.
+*        READ TABLE lt_cust_name INTO DATA(ls_cust_name3) WITH KEY partner = gs_final-l_id  BINARY SEARCH.
+*        IF sy-subrc = 0.
+*          CONCATENATE ls_cust_name3-cust_f ls_cust_name3-cust_l INTO gv_cust2 SEPARATED BY ''.
+*          gs_final-lnam = gv_cust3.
+*        ENDIF.
+
+        gs_final-prd  = gs_lead-prd.                "Vpart
+
+        READ TABLE lt_mngr_end INTO DATA(ls_mngr_end) WITH KEY zzbfld00009u = gs_lead-se(10) BINARY SEARCH.
+        IF sy-subrc = 0.
+          CLEAR :  gv_mname.
+          CONCATENATE ls_mngr_end-mfirst ls_mngr_end-mlast INTO gv_mname SEPARATED BY ''.
+          gs_final-mngr = gv_mname.
+        ELSE.
+          dl_flag = 'X'.
+        ENDIF.
+
+
+        READ TABLE lt_se_names INTO ls_se_names WITH KEY partner = gs_lead-se(10) BINARY SEARCH.
+        IF  sy-subrc = 0.
+          TRANSLATE ls_se_names-mc_name2 TO LOWER CASE.
+          TRANSLATE ls_se_names-mc_name2(1) TO UPPER CASE.
+          TRANSLATE ls_se_names-mc_name1 TO LOWER CASE.
+          TRANSLATE ls_se_names-mc_name1(1) TO UPPER CASE.
+
+          CONCATENATE ls_se_names-mc_name2 ls_se_names-mc_name1 INTO lv_se_name SEPARATED BY space.
+
+          gs_final-exec = lv_se_name.
+          IF dl_flag IS NOT INITIAL.
+            gs_final-mngr = lv_se_name.
+          ENDIF.
+
+        ENDIF.
+
+*      lv_pernr = gs_lead-se+2(10).
+*      READ TABLE lt_usr INTO ls_usr WITH KEY pernr = lv_pernr.
+*      IF sy-subrc = 0.
+        gs_final-srcno = gv_uname = gs_lead-user_id.
+*        CLEAR : lv_pernr.
+*      ENDIF.
+
+        gs_final-object_id = gs_lead-object_id.                " lead no
+*      gs_final-desc = gs_lead-description.                   " lead name
+        gs_final-customer = gs_lead-customer.                  " party no
+        gs_final-qty = gs_lead-qty.                           " qty
+
+        lv_date2 = gs_lead-created_at.
+        CONCATENATE lv_date2+0(4) lv_date2+4(2) lv_date2+6(2) INTO gs_final-posting_date.
+        CLEAR lv_date2.
+
+        gs_final-segnm = gs_lead-segnm.                " PRISM Segment
+        gs_final-seg_n = gs_lead-seg_n.
+        gs_final-hub = gs_lead-hub.                    " hub
+        gs_final-hub_n = gs_lead-hub_n.
+*        gs_final-appln = gs_lead-appln.                " appln
+        gs_final-app_n = gs_lead-app_n.
+        gs_final-sapp_n = gs_lead-sapp_n.
+        gs_final-sapp = gs_lead-pappid.
+*      gs_final-reason1 = gs_lead-reason1."Added by tp_tcs010007 on 11.06.2021
+*      gs_final-reason2 = gs_lead-reason2.
+
+        READ TABLE it_rmks INTO ls_rmks WITH KEY zobj_id = gs_lead-object_id BINARY SEARCH.
+        IF sy-subrc = 0.
+          gs_final-rmark = ls_rmks-zrmks.
+          gs_final-rmark1 = ls_rmks-zrmks_2.
+        ENDIF.
+        CLEAR : gv_cust.
+        READ TABLE lt_cust_name INTO ls_cust_name WITH KEY partner = gs_lead-customer BINARY SEARCH.
+        IF sy-subrc = 0.
+          CONCATENATE ls_cust_name-cust_f ls_cust_name-cust_l INTO gv_cust SEPARATED BY ''.
+          gs_final-cname = gv_cust.
+        ENDIF.
+        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""" Start by Aditya Bodala
+        gs_final-emp_id = gs_lead-se.                 " emp no
+        gs_final-mdesc = gs_lead-mdesc.                 " model desc
+        lv_last_upd_date = gs_lead-last_upd_date.                "
+        gs_final-last_upd_date = lv_last_upd_date+0(8). " Last updated date
+        IF gs_final-last_upd_date IS INITIAL OR gs_final-last_upd_date EQ ' '.
+          gs_final-last_upd_date = gs_lead-posting_date.   "Added by Tp-HTL206580(Alsadh)
+        ENDIF.
+
+        gs_final-prosid = gs_lead-pros.        " prospect id
+        gs_final-pdate = gs_lead-pro_cre.        " prospect description
+
+        READ TABLE lt_tel INTO ls_tel1 WITH KEY partner = gs_lead-customer BINARY SEARCH."addrnumber = gs_lead-addrnumber.
+        IF sy-subrc = 0.
+          gs_final-tel_number = ls_tel1-tel_number.              " customer phone no
+
+          CONCATENATE ls_tel1-house_num1 ls_tel1-street ls_tel1-str_suppl1
+                  ls_tel1-str_suppl2 ls_tel1-str_suppl3 ls_tel1-city1
+                  ls_tel1-city2 ls_tel1-region ls_tel1-post_code1 INTO gv_addr SEPARATED BY ''.
+
+          gs_final-addr = gv_addr.                                  " address
+
+          IF NOT ls_tel1-tel_number IS INITIAL.
+            gs_final-tel_number = gs_lead-tel_no.
+          ENDIF.
+
+        ENDIF.
+
+        READ TABLE lt_llqty INTO DATA(ls_llqty1) WITH KEY object_id = gs_final-object_id process_type = gs_lead-process_type .
+        IF sy-subrc = 0.
+          gs_final-l_sale_q = ls_llqty1-likly_sale.
+          gs_final-l_lost_q = ls_llqty1-likly_lost_qty.
+          gs_final-lost_q = ls_llqty1-lost_qty.
+
+*reason lost qty
+          IF ls_llqty-zllos_flag = '2'.
+            IF ls_llqty-competitor_name = 'M01'.
+              READ TABLE lt_zqpct INTO DATA(ls_zqpct1) WITH KEY code = ls_llqty-reason1 codegruppe = 'ZCODEALR'.
+              IF sy-subrc = 0.
+                gs_final-reason1 = ls_zqpct1-kurztext.
+              ENDIF.
+              READ TABLE lt_zqpct INTO ls_zqpct1 WITH KEY code = ls_llqty-reason2 codegruppe = 'ZCODEALR'.
+              IF sy-subrc = 0.
+                gs_final-reason2 = ls_zqpct1-kurztext.
+              ENDIF.
+            ELSE.
+              READ TABLE lt_zqpct INTO ls_zqpct1 WITH KEY code = ls_llqty-reason1 codegruppe = 'ZCOMPREA'.
+              IF sy-subrc = 0.
+                gs_final-reason1 = ls_zqpct1-kurztext.
+              ENDIF.
+              READ TABLE lt_zqpct INTO ls_zqpct1 WITH KEY code = ls_llqty-reason2 codegruppe = 'ZCOMPREA'.
+              IF sy-subrc = 0.
+                gs_final-reason2 = ls_zqpct1-kurztext.
+              ENDIF.
+            ENDIF.
+          ELSEIF ls_llqty-zllos_flag = '1'.
+            READ TABLE lt_zqpct INTO  ls_zqpct1 WITH KEY code = ls_llqty-reason1 katalogart = 'ZL'.
+            IF sy-subrc = 0.
+              gs_final-reason1 = ls_zqpct1-kurztext.
+            ENDIF.
+            READ TABLE lt_zqpct INTO  ls_zqpct1 WITH KEY code = ls_llqty-reason2 katalogart = 'ZL'.
+            IF sy-subrc = 0.
+              gs_final-reason2 = ls_zqpct1-kurztext.
+            ENDIF.
+          ELSEIF ls_llqty-zllos_flag = '3'.
+            READ TABLE lt_zqpct INTO  ls_zqpct1 WITH KEY code = ls_llqty-reason1 katalogart = 'ZCLOSDEF'.
+            IF sy-subrc = 0.
+              gs_final-reason1 = ls_zqpct1-kurztext.
+            ENDIF.
+            READ TABLE lt_zqpct INTO  ls_zqpct1 WITH KEY code = ls_llqty-reason2 katalogart = 'ZCLOSDEF'.
+            IF sy-subrc = 0.
+              gs_final-reason2 = ls_zqpct1-kurztext.
+            ENDIF.
+          ENDIF.
+          IF gs_final-status = 'Closed' OR gs_final-status = 'Deferred' .
+            CALL FUNCTION 'ZCRM_HK_ADD_MONTH_TO_DATE'
+              EXPORTING
+                months  = ls_llqty-month
+                olddate = gs_lead-last_upd_date
+              IMPORTING
+                newdate = n_date.
+
+            IF n_date IS NOT INITIAL.
+              gs_final-like_m = n_date+4(2).
+              gs_final-like_y = n_date+0(4).
+            ENDIF.
+          ENDIF.
+        ENDIF.
+        gs_final-exp_sale_dt = gs_lead-exp_sale_dt.
+        gs_final-camp_id = gs_lead-camp_id.
+*        gs_final-par_lead_id = gs_lead-par_lead_id.
+        READ TABLE c_parent INTO DATA(ls_cparent1) WITH KEY order_no = gs_lead-p_order proc_type = 'ZALD'. "added by TP_HTL206580(Alsadh)
+        IF sy-subrc = 0.
+          gs_final-par_lead_id = gs_lead-p_order.
+        ENDIF.
+        IF gs_final-camp_id IS INITIAL.
+          READ TABLE lt_lead INTO ls_camp WITH KEY object_id = gs_final-object_id.
+          IF sy-subrc = 0.
+            gs_final-camp_id = ls_camp-camp_id.
+*            gs_final-camp_des1 = ls_camp-camp_des1.
+          ENDIF.
+          READ TABLE lt_campdesc INTO DATA(ls_campdesc1) WITH KEY external_id = gs_final-camp_id.
+          IF sy-subrc = 0.
+            gs_final-camp_des1 = ls_campdesc1-text1.
+          ENDIF.
+
+        ENDIF.
+
+        READ TABLE lt_ho INTO DATA(ls_ho1) WITH KEY lead_id = gs_lead-object_id.
+        IF sy-subrc = 0 .
+          gs_final-origin = 'HO Leads'.
+        ELSE .
+          gs_final-origin = 'PRISM 2.0 App'.
+        ENDIF.
+
+        IF dsm_flg = 'X'.
+          gs_final-mngr = gs_mngr-zdo_m_name.
+        ENDIF.
+
+        IF user_alse NE 'X'.
+          IF gs_lead-segnm IS INITIAL.
+            APPEND gs_final TO gt_final.
+          ELSE.
+            IF line_exists( lt_seg[ segid = gs_lead-segnm ] ).
+              APPEND gs_final TO gt_final.
+            ENDIF.
+          ENDIF.
+        ELSE.
+          IF line_exists( lt_seg[ segid = gs_lead-segnm ] ).
+            APPEND gs_final TO gt_final.
+          ENDIF.
+        ENDIF.
+
+        CLEAR gs_final.
+      ENDIF.
+      CLEAR:lv_se_name, dl_flag, gs_final,gs_lead,gv_cust,gv_uname,gs_org_x,ls_tel1,gv_addr,gv_mname,ls_mngr,ls_rmks. "ls_status2 , ls_tel2 , ls_mngr1
+    ENDLOOP.
+  ENDIF.
+
+  "Begin of changes added by TP_HTL010108 28-01-2025
+  IF s_udate[] IS NOT INITIAL.
+    IF s_udate-high IS INITIAL OR s_udate-high EQ '00000000'.
+      DELETE gt_final WHERE last_upd_date NE s_udate-low.
+    ELSE.
+      DELETE gt_final WHERE last_upd_date NOT BETWEEN s_udate-low AND s_udate-high.
+    ENDIF.
+  ENDIF.
+  "End of changes added  by TP_HTL010108 28-01-2025
+
+  " to find no of entries
+  CLEAR: gv_entry.
+  CLEAR : user_alse, dsm_flg.
+  DATA : it_exe TYPE RANGE OF bu_partner,
+         ls_exe LIKE LINE OF it_exe.
+
+  IF p_exec IS NOT INITIAL OR p_mngr IS NOT INITIAL.
+    LOOP AT gt_org_x INTO DATA(gs_orgx2).
+      ls_exe-sign = 'I'.
+      ls_exe-option = 'EQ'.
+      ls_exe-low = gs_orgx2-div_se_bp.
+      APPEND ls_exe TO it_exe.
+    ENDLOOP.
+    IF it_exe IS NOT INITIAL.
+      DELETE gt_final WHERE emp_id NOT IN it_exe.
+    ENDIF.
+  ENDIF.
+  DELETE gt_final WHERE   camp_id  NOT IN s_cid .           "15112021"
+*  DESCRIBE TABLE gt_final LINES gv_entry.                               "Commented by tp_htl010108 0n 24-07-2023
+
+***Start of Changes - 17/08/2022
+  IF p_orign IS NOT INITIAL.
+    DELETE gt_final WHERE origin <> p_orign.
+  ENDIF.
+*******End of Changes - 17/08/2022
+
+  DESCRIBE TABLE gt_final LINES gv_entry.                                "Added by by tp_htl010108 0n 24-07-2023
+  CLEAR:gv_flag.
+  IF gt_final[] IS INITIAL.
+    gv_flag = 'X'.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  BUILD_FLD_CATALOG
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM build_fld_catalog .
+  FREE gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'ZONE'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-003.          " Zone
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'REGION'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-004.          " Region
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'AREA'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-005.          " Area
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'SO'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-006.          " Dealership
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'ZDO_CODE'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-030.          " Dealer Outlet code
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'ZDO'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-007.          " Dealer Outlet
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'MNGR'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-008.          " DL Manager
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'EXEC'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-009.          " SE
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'SRCNO'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-010.          " source no
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'EMP_ID'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-031.          " emp no
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'CUSTOMER'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-012.          " party no
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'CNAME'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-011.          " party name
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'TEL_NUMBER'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-013.          " phone no
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'ADDR'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-027.          " cust addr
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'OBJECT_ID'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-014.          " lead no
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'STAGE'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-019.          " lead stage
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'HUB'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-023.          " hub
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'HUB_N'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-038.          " hub NAME
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'APPLN'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-024.          " appln
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'APP_N'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-039.          " appln nAME
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'SAPP'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-042.          " sec appln ID
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'SAPP_N'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-041.          " sec appln nAME
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'SEGNM'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-025.          " seg
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'SEG_N'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-040.          " seg NAME
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'MDESC'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-033.          " mdesc
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'PRD'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-037.          " VPart
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'VQTY'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-055.          " VPart QTY
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'L_LOST_Q'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-048.          " financier
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'L_SALE_Q'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-047.          " financier
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'LOST_Q'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-046.          " financier
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'QTY'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-026.          " quantity
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'PAR_LEAD_ID'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-057.          " Origin
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'ORIGIN'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-052.          " Origin
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'POSTING_DATE'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-028.          " lead creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'LAST_UPD_DATE'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-032.          " Last Updated date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'STATUS'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-022.          " pros status
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'REASON1'.        "Modified by tp_tcs010007 on 11.06.2021
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-059.          " pros status
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'REASON2'.        "Added by tp_tcs010007 on 11.06.2021
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-062.          " pros status
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'LIKE_M'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = 'Likely To Purchase Month'.          " pros status
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'LIKE_Y'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = 'Likely To Purchase Year'.          " pros status
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'RMARK'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-060.          " pros status
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'RMARK1'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-061.          " pros status
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'PROSID'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-020.          " pros id
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+*  CLEAR gs_fieldcat.
+*  gs_fieldcat-fieldname = 'PDESC'.
+*  gs_fieldcat-tabname   = c_final.
+*  gs_fieldcat-seltext_l = text-021.          " pros description
+*  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'PDATE'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-029.          " pros creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'SOURCE'.            "uncommented by TP_HTL010108 for source field
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-063.
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'LTYP_N'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-043.          " pros creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'LNAM'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-044.          " pros creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'L_ID'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-045.          " pros creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'EXP_SALE_DT'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-049.          " quote creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'CAMP_ID'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-050.          " quote creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+  gs_fieldcat-fieldname = 'CAMP_DES1'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-051.          " quote creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+
+  CLEAR gs_fieldcat.
+
+  gs_fieldcat-fieldname = 'PRMET'.
+  gs_fieldcat-tabname   = c_final.
+  gs_fieldcat-seltext_l = TEXT-064.          " quote creation date
+  APPEND gs_fieldcat TO gt_fieldcat.
+  CLEAR gs_fieldcat.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  LAYOUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM layout .
+  gs_layout-colwidth_optimize = 'X'.
+  gs_layout-zebra = 'X'.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY_ALV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM display_alv .
+  SORT gt_final BY posting_date.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program     = sy-repid
+      i_callback_top_of_page = 'TOP_OF_PAGE'
+      is_layout              = gs_layout
+      it_fieldcat            = gt_fieldcat
+    TABLES
+      t_outtab               = gt_final
+    EXCEPTIONS
+      program_error          = 1
+      OTHERS                 = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+ENDFORM.
+FORM top_of_page.
+
+  DATA: lt_header TYPE slis_t_listheader,
+        ls_header TYPE slis_listheader.
+* Title
+  ls_header-typ  = 'H'.
+  ls_header-info = TEXT-002.
+  APPEND ls_header TO lt_header.
+  CLEAR ls_header.
+  ls_header-typ  = 'S'.
+  ls_header-key = TEXT-017.
+  gv_cdate_l = s_cdate-low.
+  gv_cdate_h = s_cdate-high.
+
+  CONCATENATE gv_cdate_l+6(2) gv_cdate_l+4(2) gv_cdate_l+0(4) INTO gv_cdate_l SEPARATED BY '.'.
+  CONCATENATE gv_cdate_h+6(2) gv_cdate_h+4(2) gv_cdate_h+0(4) INTO gv_cdate_h SEPARATED BY '.'.
+
+  IF s_cdate-low IS NOT INITIAL AND s_cdate-high IS NOT INITIAL.
+    CONCATENATE gv_cdate_l 'to' gv_cdate_h INTO ls_header-info SEPARATED BY ''.
+  ELSE.
+    IF s_cdate-low IS NOT INITIAL.
+      ls_header-info = gv_cdate_l.
+    ELSE.
+      IF s_cdate-high IS NOT INITIAL.
+        ls_header-info = gv_cdate_h.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+  APPEND ls_header TO lt_header.
+  CLEAR: ls_header.
+
+  " no of entry
+  ls_header-typ  = 'S'.
+  ls_header-key = TEXT-018.
+  MOVE gv_entry TO ls_header-info.
+  APPEND ls_header TO lt_header.
+  CLEAR: ls_header.
+
+  CALL FUNCTION 'REUSE_ALV_COMMENTARY_WRITE'
+    EXPORTING
+      it_list_commentary = lt_header.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data .
+  SELECT DISTINCT
+        order_no
+    FROM zcrm_order
+    INTO TABLE @DATA(lt_obj)
+    WHERE proc_type = 'ZALD'.
+
+  SORT lt_obj  BY order_no.
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'OBJECT_ID'
+      dynpprog        = sy-repid
+      dynpnr          = sy-dynnr
+      dynprofield     = 'S_OBJID'
+      value_org       = 'S'
+    TABLES
+      value_tab       = lt_obj
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  ZONE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM zone .
+  FREE: gt_zone,gv_zone.
+  LOOP AT gt_org INTO gs_org.
+    gs_zone-key = gs_org-zo.
+    gs_zone-text = gs_org-zo_name.
+    APPEND gs_zone TO gt_zone.
+    CLEAR: gs_zone,gs_org.
+  ENDLOOP.
+  SORT gt_zone BY key.
+  DELETE ADJACENT DUPLICATES FROM gt_zone.
+  gv_zone = 'P_ZONE'.
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_zone
+      values = gt_zone
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  REGION
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM region .
+  FREE: gt_reg,gv_reg.
+  IF p_zone IS NOT INITIAL.
+    REPLACE ALL OCCURRENCES OF '*' IN p_zone WITH '%' IN CHARACTER MODE.                          "For Search all matching Records.
+    IF gv_input IS INITIAL.
+      CONCATENATE   'ZO' ' = ' '''' p_zone ''''
+            INTO gv_input RESPECTING BLANKS.
+    ENDIF.
+  ENDIF.
+
+  LOOP AT gt_org INTO gs_org WHERE (gv_input).
+    gs_reg-key = gs_org-ro.
+    gs_reg-text = gs_org-ro_name.
+    APPEND gs_reg TO gt_reg.
+    CLEAR: gs_reg,gs_org.
+  ENDLOOP.
+  SORT gt_reg BY key.
+  DELETE ADJACENT DUPLICATES FROM gt_reg.
+  gv_reg = 'P_REG'.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_reg
+      values = gt_reg
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF p_reg IS NOT INITIAL." AND P_ZONE IS INITIAL.
+    READ TABLE gt_org INTO gs_org WITH KEY ro = p_reg.
+    IF sy-subrc = 0.
+      p_zone = gs_org-zo.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  AREA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM area .
+  FREE: gv_area,gt_area.
+  IF p_reg IS NOT INITIAL.
+    REPLACE ALL OCCURRENCES OF '*' IN p_reg WITH '%' IN CHARACTER MODE.                          "For Search all matching Records.
+    IF gv_input IS INITIAL.
+      CONCATENATE   'RO' ' = ' '''' p_reg ''''
+            INTO gv_input RESPECTING BLANKS.
+    ELSE.
+      CONCATENATE  gv_input ' AND ' 'RO' ' = '
+            '''' p_reg '''' INTO gv_input RESPECTING BLANKS.
+    ENDIF.
+  ENDIF.
+
+  LOOP AT gt_org INTO gs_org WHERE (gv_input).
+    gs_area-key = gs_org-ao.
+    gs_area-text = gs_org-ao_name.
+    APPEND gs_area TO gt_area.
+    CLEAR: gs_area,gs_org.
+  ENDLOOP.
+  SORT gt_area BY key.
+  DELETE ADJACENT DUPLICATES FROM gt_area.
+  gv_area = 'P_AREA'.
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_area
+      values = gt_area
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF p_area IS NOT INITIAL." AND P_REG IS INITIAL AND P_ZONE IS INITIAL.
+    READ TABLE gt_org INTO gs_org WITH KEY ao = p_area.
+    IF sy-subrc = 0.
+      p_reg = gs_org-ro.
+      p_zone = gs_org-zo.
+    ENDIF.
+  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  SO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM so .
+  FREE: gt_so,gv_so.
+  IF p_area IS NOT INITIAL.
+    REPLACE ALL OCCURRENCES OF '*' IN p_area WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+    IF gv_input IS INITIAL.
+      CONCATENATE   'AO' ' = ' '''' p_area ''''
+            INTO gv_input RESPECTING BLANKS.
+    ELSE.
+      CONCATENATE  gv_input ' AND ' 'AO' ' = '
+            '''' p_area '''' INTO gv_input RESPECTING BLANKS.
+    ENDIF.
+  ENDIF.
+
+  LOOP AT gt_org INTO gs_org WHERE (gv_input).
+    gs_so-key = gs_org-so.
+    gs_so-text = gs_org-so_name.
+    APPEND gs_so TO gt_so.
+    CLEAR: gs_so,gs_org.
+  ENDLOOP.
+  SORT gt_so BY key.
+  DELETE ADJACENT DUPLICATES FROM gt_so.
+  gv_so = 'P_SO'.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_so
+      values = gt_so
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF p_so IS NOT INITIAL." AND P_AREA IS INITIAL AND P_REG IS INITIAL AND P_ZONE IS INITIAL.
+    READ TABLE gt_org INTO gs_org WITH KEY so = p_so.
+    IF sy-subrc = 0.
+      p_area = gs_org-ao.
+      p_reg = gs_org-ro.
+      p_zone = gs_org-zo.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  DO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM zdo .
+  FREE: gt_zdo,gv_zdo.
+
+  IF p_so IS NOT INITIAL.
+    REPLACE ALL OCCURRENCES OF '*' IN p_so WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+    IF gv_input IS INITIAL.
+      CONCATENATE   'SO' ' = ' '''' p_so ''''
+            INTO gv_input RESPECTING BLANKS.
+    ELSE.
+      CONCATENATE  gv_input ' AND ' 'SO' ' = '
+            '''' p_so '''' INTO gv_input RESPECTING BLANKS.
+    ENDIF.
+  ENDIF.
+
+  LOOP AT gt_org INTO gs_org WHERE (gv_input).
+    gs_zdo-key = gs_org-zdo.
+    gs_zdo-text = gs_org-zdo_name.
+    APPEND gs_zdo TO gt_zdo.
+    CLEAR: gs_zdo,gs_org.
+  ENDLOOP.
+  SORT gt_zdo BY key.
+  DELETE ADJACENT DUPLICATES FROM gt_zdo.
+  gv_zdo = 'P_ZDO'.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_zdo
+      values = gt_zdo
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF p_zdo IS NOT INITIAL." AND P_SO IS INITIAL AND P_AREA IS INITIAL AND P_REG IS INITIAL AND P_ZONE IS INITIAL.
+    READ TABLE gt_org INTO gs_org WITH KEY zdo = p_zdo.
+    IF sy-subrc = 0.
+      p_so = gs_org-so.
+      p_area = gs_org-ao.
+      p_reg = gs_org-ro.
+      p_zone = gs_org-zo.
+    ENDIF.
+  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  MNGR
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM mngr .
+  FREE:gt_mngr,gv_mngr.
+
+  IF p_zdo IS NOT INITIAL.
+    REPLACE ALL OCCURRENCES OF '*' IN p_zdo WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+    IF gv_input IS INITIAL.
+      CONCATENATE   'ZDO' ' = ' '''' p_zdo ''''
+            INTO gv_input RESPECTING BLANKS.
+    ELSE.
+      CONCATENATE  gv_input ' AND ' 'ZDO' ' = '
+            '''' p_zdo '''' INTO gv_input RESPECTING BLANKS.
+    ENDIF.
+  ENDIF.
+
+
+  LOOP AT gt_org INTO gs_org WHERE (gv_input).
+    gs_mngr-key = gs_org-zdo_m_bp.
+    gs_mngr-text = gs_org-zdo_m_name.
+    APPEND gs_mngr TO gt_mngr.
+    CLEAR: gs_mngr,gs_org.
+  ENDLOOP.
+  SORT gt_mngr BY key.
+  DELETE ADJACENT DUPLICATES FROM gt_mngr.
+  gv_mngr = 'P_MNGR'.
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_mngr
+      values = gt_mngr
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF p_mngr IS NOT INITIAL." AND P_SO IS INITIAL AND P_AREA IS INITIAL AND P_REG IS INITIAL AND P_ZONE IS INITIAL.
+    READ TABLE gt_org INTO gs_org WITH KEY zdo_m_bp = p_mngr.
+    IF sy-subrc = 0.
+      p_mngr = gs_org-zdo_m_bp.
+      p_zdo = gs_org-zdo.
+      p_so = gs_org-so.
+      p_area = gs_org-ao.
+      p_reg = gs_org-ro.
+      p_zone = gs_org-zo.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  EXEC
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM exec .
+
+  FREE: gt_exec,gv_exec.
+  IF p_mngr IS NOT INITIAL.
+    REPLACE ALL OCCURRENCES OF '*' IN p_mngr WITH '%' IN CHARACTER MODE.                       "For Search all matching Records.
+    IF gv_input IS INITIAL.
+      CONCATENATE   'ZDO_M_BP' ' = ' '''' p_mngr ''''
+            INTO gv_input RESPECTING BLANKS.
+    ELSE.
+      CONCATENATE  gv_input ' AND ' 'ZDO_M_BP' ' = '
+            '''' p_mngr '''' INTO gv_input RESPECTING BLANKS.
+    ENDIF.
+  ENDIF.
+
+  LOOP AT gt_org INTO gs_org WHERE (gv_input).
+    gs_exec-key = gs_org-div_se_bp.
+    gs_exec-text = gs_org-div_se_name.
+    APPEND gs_exec TO gt_exec.
+    CLEAR: gs_exec,gs_org.
+  ENDLOOP.
+  SORT gt_exec  BY key.
+  DELETE ADJACENT DUPLICATES FROM gt_exec.
+  gv_exec = 'P_EXEC'.
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_exec
+      values = gt_exec
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF p_exec IS NOT INITIAL." AND P_SO IS INITIAL AND P_AREA IS INITIAL AND P_REG IS INITIAL AND P_ZONE IS INITIAL.
+    READ TABLE gt_org INTO gs_org WITH KEY div_se_bp = p_exec.
+    IF sy-subrc = 0.
+      p_mngr = gs_org-zdo_m_bp.
+      p_zdo = gs_org-zdo.
+      p_so = gs_org-so.
+      p_area = gs_org-ao.
+      p_reg = gs_org-ro.
+      p_zone = gs_org-zo.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  STAGE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM stage .
+  FREE: gt_stage,gv_stage.
+  SELECT DISTINCT                                       "#EC CI_NOFIELD
+             stage
+      FROM zcrm_order
+      INTO TABLE @DATA(lt_lstage)
+      WHERE stage IN ('L1','L2','L3').
+
+  SORT lt_lstage BY stage.
+  LOOP AT lt_lstage INTO DATA(ls_lstage).
+    IF ls_lstage-stage = 'L1'.
+      gs_stage-key = ls_lstage-stage.
+      gs_stage-text = 'L1'.
+    ELSE.
+      IF ls_lstage-stage = 'L2'.
+        gs_stage-key = ls_lstage-stage.
+        gs_stage-text = 'L2'.
+      ELSE.
+        IF ls_lstage-stage = 'L3'.
+          gs_stage-key = ls_lstage-stage.
+          gs_stage-text = 'L3'.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+
+    APPEND gs_stage TO gt_stage.
+    CLEAR: gs_stage,ls_lstage.
+  ENDLOOP.
+
+  gv_stage = 'P_STAGE'.
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_stage
+      values = gt_stage
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_LEADNO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_leadno .
+  SELECT order_no
+    FROM zcrm_order
+    INTO TABLE @DATA(lt_leadno)
+    WHERE proc_type = 'ZALD'.
+
+  SORT lt_leadno BY order_no.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'OBJECT_ID'
+      dynpprog        = sy-repid
+      dynpnr          = sy-dynnr
+      dynprofield     = 'S_LEADNO'
+      value_org       = 'S'
+    TABLES
+      value_tab       = lt_leadno
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_SRCNO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_SE  text
+*----------------------------------------------------------------------*
+FORM get_srcno  USING    p_se.
+  CLEAR gv_se.
+  gv_se = p_se.
+  CALL FUNCTION 'CRM_CENTRALPERSON_GET'
+    EXPORTING
+      iv_person_id        = gv_se
+*     IV_BU_PARTNER_GUID  =
+*     IV_EMPLOYEE_ID      =
+*     IV_USERNAME         =
+    IMPORTING
+*     EV_PERSON_ID        =
+*     EV_BU_PARTNER_GUID  =
+      ev_username         = gv_uname
+*     ET_EMPLOYEE_ID      =
+*     EV_NAME             =
+    EXCEPTIONS
+      no_central_person   = 1
+      no_business_partner = 2
+      no_id               = 3
+      OTHERS              = 4.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_STATUS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_status .
+
+*  SELECT estat, txt30
+*   FROM tj30t
+*   INTO TABLE @DATA(lt_l_status)
+*   WHERE stsma = 'ZCRMLEAD' AND spras  = 'E'.
+
+  SELECT status,descri FROM zcrmt_status INTO TABLE @DATA(lt_l_status)
+    WHERE pr_type = 'ZALD'.
+
+  SORT lt_l_status BY status."estat.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'STATUS' "'ESTAT' " 'OBJECT_ID'
+      dynpprog        = sy-repid
+      dynpnr          = sy-dynnr
+      dynprofield     = 'S_STAT'
+      value_org       = 'S'
+    TABLES
+      value_tab       = lt_l_status
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  LTY
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM lty .
+  SELECT DISTINCT para1,
+                  para2
+                  FROM zmbc_codechange
+                  INTO TABLE @DATA(it_type)
+                  WHERE cotyp = 'ZSOURCE'.               "#EC CI_BYPASS
+
+
+  LOOP AT it_type INTO DATA(wa_type).
+    gs_ltype-key = wa_type-para1.
+    gs_ltype-text = wa_type-para2.
+    APPEND gs_ltype TO gt_ltype.
+    CLEAR gs_ltype.
+  ENDLOOP.
+
+  gv_ltype = 'P_LTYPE'.
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_ltype
+      values = gt_ltype
+    EXCEPTIONS
+*     ID_ILLEGAGV_NAME = 1
+      OTHERS = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+ENDFORM.
+
+******* Start of Changes - 18/08/2022
+FORM orign .
+*  free:GT_origin,GV_origin.
+
+  DATA:ls_list TYPE vrm_value,
+       lt_list TYPE vrm_values.
+
+  CLEAR: ls_list,lt_list[].
+
+  ls_list-key = 'HO Leads'.
+  APPEND ls_list TO lt_list.
+
+  CLEAR: ls_list.
+  ls_list-key = 'PRISM 2.0 App'.
+  APPEND ls_list TO lt_list.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_ORIGN'
+      values = lt_list.
+
+ENDFORM.
